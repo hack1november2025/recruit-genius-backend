@@ -1,63 +1,111 @@
-"""API routes for AI-powered job description generation."""
+"""API routes for conversational AI-powered job description generation."""
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
-from app.schemas.job_description import (
-    JobDescriptionGenerateRequest,
-    JobDescriptionResponse,
-)
+from pydantic import BaseModel
 from app.services.job_generator import JobGeneratorService
-import json
+import uuid
 
 router = APIRouter(prefix="/job-descriptions", tags=["job-descriptions"])
 
+# Initialize service once
+job_service = JobGeneratorService()
 
-@router.post("/generate", response_model=JobDescriptionResponse)
-async def generate_job_description(
-    request: JobDescriptionGenerateRequest,
-    stream: bool = Query(False, description="Enable streaming response")
+
+class ChatRequest(BaseModel):
+    """Request for conversational job generation."""
+    message: str
+
+
+class ChatResponse(BaseModel):
+    """Response from conversational job generation."""
+    response: str
+    thread_id: str
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat_job_description(
+    request: ChatRequest,
+    thread_id: str = Query(None, description="Conversation thread ID for persistence")
 ):
     """
-    Generate a complete job description from a brief description.
+    Chat with the job description generator agent.
     
-    This endpoint uses AI to expand a short job summary into a full,
-    professional job posting with responsibilities, qualifications, and benefits.
+    This conversational endpoint allows you to:
+    - Create job descriptions from simple text prompts
+    - Request modifications to existing descriptions
+    - Maintain context across multiple messages
+    - Save approved descriptions to the database via agent tool
+    
+    The agent returns only markdown-formatted job descriptions.
     
     Args:
-        request: Brief description and optional parameters (department, location, tone)
-        stream: If True, returns streaming response. If False, returns complete response.
+        request: User message (e.g., "Create job for senior Python developer")
+        thread_id: Optional thread ID to continue existing conversation
         
     Returns:
-        Complete job description with all sections, or streaming updates if stream=True
+        Markdown job description and thread_id for future messages
         
-    Example:
+    Examples:
         ```
-        POST /api/v1/job-descriptions/generate
-        {
-            "brief_description": "Senior backend developer with Python and AWS experience",
-            "department": "Engineering",
-            "location": "Remote",
-            "tone": "friendly"
-        }
+        # Start new conversation
+        POST /api/v1/job-descriptions/chat
+        {"message": "Create job posting for senior backend engineer with 5 years Python"}
+        
+        # Continue conversation with modifications
+        POST /api/v1/job-descriptions/chat?thread_id=abc123
+        {"message": "Make it more friendly and emphasize remote work"}
+        
+        # Save to database
+        POST /api/v1/job-descriptions/chat?thread_id=abc123
+        {"message": "Save this job with title 'Senior Backend Engineer'"}
         ```
     """
-    service = JobGeneratorService()
+    # Generate thread_id if not provided
+    if not thread_id:
+        thread_id = f"job_{uuid.uuid4().hex[:12]}"
     
-    if stream:
-        # Streaming response
-        async def event_stream():
-            async for event in service.generate_description_stream(request):
-                # Send as Server-Sent Events format
-                yield f"data: {json.dumps(event)}\n\n"
+    # Get response from agent
+    response = await job_service.chat(request.message, thread_id)
+    
+    return ChatResponse(
+        response=response,
+        thread_id=thread_id
+    )
+
+
+@router.post("/chat/stream")
+async def stream_chat_job_description(
+    request: ChatRequest,
+    thread_id: str = Query(None, description="Conversation thread ID")
+):
+    """
+    Stream chat responses from the job description generator.
+    
+    Same functionality as /chat but returns streaming response.
+    Useful for real-time UI updates as the agent generates content.
+    
+    Returns:
+        Server-Sent Events stream with markdown chunks
+    """
+    if not thread_id:
+        thread_id = f"job_{uuid.uuid4().hex[:12]}"
+    
+    async def event_stream():
+        # Send thread_id first
+        yield f"data: {{'thread_id': '{thread_id}'}}\n\n"
         
-        return StreamingResponse(
-            event_stream(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",
-            }
-        )
-    else:
-        # Regular response
-        result = await service.generate_description(request)
-        return result
+        # Stream agent responses
+        async for chunk in job_service.stream_chat(request.message, thread_id):
+            yield f"data: {{'chunk': {repr(chunk)}}}\n\n"
+        
+        yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )
+

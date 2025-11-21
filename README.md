@@ -4,17 +4,20 @@ AI-powered recruitment assistant built with FastAPI, LangGraph, and PostgreSQL.
 
 ## Features
 
-- **Resume Analysis**: Parse and analyze candidate resumes
-- **Job Matching**: Match candidates to job positions using AI
-- **Interview Scheduling**: Manage interview scheduling and coordination
-- **Candidate Screening**: AI-powered initial screening conversations
+- **🤖 Conversational Job Generator**: AI-powered job description creation with context maintenance
+- **📄 Resume Analysis**: Parse and analyze candidate resumes (PDF/DOCX)
+- **🎯 Job Matching**: Match candidates to job positions using AI with 8-metric evaluation
+- **💬 RAG Chat Interface**: Semantic search across CVs with pgvector
+- **📊 Analytics Dashboard**: Real-time recruitment metrics and insights
 
 ## Tech Stack
 
 - **FastAPI**: Modern async web framework
-- **LangGraph**: AI agent orchestration with state management
-- **PostgreSQL**: Database with LangGraph checkpointing
-- **OpenAI**: LLM for intelligent processing
+- **LangGraph 0.2.45**: AI agent orchestration with PostgreSQL checkpointing
+- **LangChain 0.3.7**: LLM integration and tools
+- **PostgreSQL + pgvector**: Database with vector similarity search
+- **Redis**: Caching layer for analytics
+- **OpenAI**: GPT-4o-mini for generation, text-embedding-3-small for embeddings
 
 ## Quick Start
 
@@ -96,12 +99,33 @@ app/
 
 ## API Endpoints
 
+### Conversational Job Generator (NEW)
+- `POST /api/v1/job-descriptions/chat` - Chat with job generator agent
+  - Send simple text: `{"message": "Create job for senior Python developer"}`
+  - Returns markdown job description with thread_id
+  - Use thread_id to continue conversation: `?thread_id=job_abc123`
+  - Request modifications: `{"message": "Make it more friendly"}`
+  - Save to database: `{"message": "Save with title Senior Python Developer"}`
+- `POST /api/v1/job-descriptions/chat/stream` - Streaming version
+
+### Standard CRUD
 - `POST /api/v1/candidates` - Create candidate
 - `POST /api/v1/candidates/{id}/analyze` - Analyze resume
 - `POST /api/v1/jobs` - Create job posting
 - `POST /api/v1/matches` - Match candidates to jobs
 - `GET /api/v1/candidates` - List candidates
 - `GET /api/v1/jobs` - List jobs
+
+### Quick Test
+```bash
+# Test conversational job generator
+./test_chat_api.sh
+
+# Or manually
+curl -X POST "http://localhost:8000/api/v1/job-descriptions/chat" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Create job for senior backend engineer with Python"}'
+```
 
 ## Development
 

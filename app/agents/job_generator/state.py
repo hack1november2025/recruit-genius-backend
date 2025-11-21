@@ -5,26 +5,11 @@ from langchain_core.messages import BaseMessage
 
 
 class JobGeneratorState(TypedDict):
-    """State schema for job generator agent."""
+    """State schema for conversational job generator agent."""
     messages: Annotated[list[BaseMessage], add_messages]
-    brief_description: str
-    department: str | None
-    location: str | None
-    employment_type: str | None
-    salary_range: str | None
-    tone: str  # formal, friendly, inclusive
     
-    # Generated content
-    job_title: str | None
-    full_description: str | None
-    responsibilities: list[str]
-    required_qualifications: list[str]
-    preferred_qualifications: list[str]
-    benefits: list[str]
+    # Current generated job description (in markdown)
+    job_description_markdown: str | None
     
-    # Quality checks
-    inclusivity_score: float
-    flagged_terms: list[str]
-    
-    # Control
-    needs_regeneration: bool
+    # Metadata about the job
+    job_metadata: dict  # Can store title, department, location, etc.

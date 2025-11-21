@@ -1,120 +1,90 @@
-"""Service for AI-powered job description generation."""
-import time
+"""Service for conversational AI-powered job description generation."""
 from app.agents.job_generator.graph import create_job_generator_graph
-from app.agents.job_generator.state import JobGeneratorState
-from app.schemas.job_description import JobDescriptionGenerateRequest, JobDescriptionResponse
+from langchain_core.messages import HumanMessage
 from app.core.logging import llm_logger
 
 
 class JobGeneratorService:
-    """Service to orchestrate job description generation."""
+    """Service for conversational job description generation."""
     
     def __init__(self):
-        self.graph = create_job_generator_graph()
+        self.graph = None
     
-    async def generate_description(
-        self, 
-        request: JobDescriptionGenerateRequest
-    ) -> JobDescriptionResponse:
+    async def initialize(self):
+        """Initialize the agent graph with async checkpointer."""
+        if not self.graph:
+            self.graph = await create_job_generator_graph()
+            llm_logger.info("Job generator graph initialized")
+    
+    async def chat(self, message: str, thread_id: str) -> str:
         """
-        Generate a complete job description from a brief.
+        Chat with the job generator agent.
         
         Args:
-            request: Generation request with brief and parameters
-            
+            message: User message (e.g., "Create job for senior Python developer")
+            thread_id: Conversation thread ID for persistence
+        
         Returns:
-            Complete job description with metadata
+            Agent's markdown response
         """
-        start_time = time.time()
+        await self.initialize()
         
-        # Prepare initial state
-        initial_state: JobGeneratorState = {
-            "messages": [],
-            "brief_description": request.brief_description,
-            "department": request.department,
-            "location": request.location,
-            "employment_type": request.employment_type,
-            "salary_range": request.salary_range,
-            "tone": request.tone,
-            "job_title": None,
-            "full_description": None,
-            "responsibilities": [],
-            "required_qualifications": [],
-            "preferred_qualifications": [],
-            "benefits": [],
-            "inclusivity_score": 100.0,
-            "flagged_terms": [],
-            "needs_regeneration": False,
+        # Prepare configuration with thread_id for checkpointing
+        config = {
+            "configurable": {
+                "thread_id": thread_id
+            }
         }
         
-        # Execute graph
-        llm_logger.info(f"Generating job description for: {request.brief_description[:50]}...")
+        # Prepare initial state
+        initial_state = {
+            "messages": [HumanMessage(content=message)]
+        }
         
-        result = await self.graph.ainvoke(initial_state)
+        # Invoke graph
+        result = await self.graph.ainvoke(initial_state, config=config)
         
-        generation_time = int((time.time() - start_time) * 1000)
+        # Extract last AI message
+        messages = result.get("messages", [])
+        if messages:
+            last_message = messages[-1]
+            response = last_message.content if hasattr(last_message, 'content') else str(last_message)
+            
+            llm_logger.info(f"Generated response for thread {thread_id}")
+            return response
         
-        llm_logger.info(f"Job description generated in {generation_time}ms")
-        
-        # Build response
-        response = JobDescriptionResponse(
-            job_title=result["job_title"] or "Untitled Position",
-            full_description=result["full_description"] or "",
-            responsibilities=result["responsibilities"],
-            required_qualifications=result["required_qualifications"],
-            preferred_qualifications=result["preferred_qualifications"],
-            benefits=result["benefits"],
-            inclusivity_score=result["inclusivity_score"],
-            flagged_terms=result["flagged_terms"],
-            generation_time_ms=generation_time,
-            department=request.department,
-            location=request.location,
-            employment_type=request.employment_type,
-            salary_range=request.salary_range,
-        )
-        
-        return response
+        return "No response generated."
     
-    async def generate_description_stream(
-        self,
-        request: JobDescriptionGenerateRequest
-    ):
+    async def stream_chat(self, message: str, thread_id: str):
         """
-        Generate job description with streaming updates.
+        Stream chat responses from the agent.
         
         Args:
-            request: Generation request
-            
+            message: User message
+            thread_id: Conversation thread ID
+        
         Yields:
-            Partial state updates as they complete
+            Markdown chunks as they're generated
         """
-        # Prepare initial state
-        initial_state: JobGeneratorState = {
-            "messages": [],
-            "brief_description": request.brief_description,
-            "department": request.department,
-            "location": request.location,
-            "employment_type": request.employment_type,
-            "salary_range": request.salary_range,
-            "tone": request.tone,
-            "job_title": None,
-            "full_description": None,
-            "responsibilities": [],
-            "required_qualifications": [],
-            "preferred_qualifications": [],
-            "benefits": [],
-            "inclusivity_score": 100.0,
-            "flagged_terms": [],
-            "needs_regeneration": False,
+        await self.initialize()
+        
+        config = {
+            "configurable": {
+                "thread_id": thread_id
+            }
         }
         
-        llm_logger.info(f"Streaming job description generation for: {request.brief_description[:50]}...")
+        initial_state = {
+            "messages": [HumanMessage(content=message)]
+        }
         
-        # Stream updates from graph
-        async for event in self.graph.astream(initial_state):
-            # Each event is a dict with node name as key
+        # Stream graph execution
+        async for event in self.graph.astream(initial_state, config=config):
+            # Extract AI messages from events
             for node_name, node_output in event.items():
-                yield {
-                    "node": node_name,
-                    "data": node_output
-                }
+                if "messages" in node_output:
+                    messages = node_output["messages"]
+                    for msg in messages:
+                        if hasattr(msg, 'content') and msg.content:
+                            yield msg.content
+

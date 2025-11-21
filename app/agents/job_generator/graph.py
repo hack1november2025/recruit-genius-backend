@@ -3,7 +3,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.prebuilt import ToolNode
 from app.agents.job_generator.state import JobGeneratorState
-from app.agents.job_generator.nodes import call_model, route_after_agent
+from app.agents.job_generator.nodes import call_model, route_after_agent, summarize_messages
 from app.agents.job_generator.tools import save_job_to_database
 from app.core.config import get_settings
 from app.core.logging import llm_logger
@@ -53,11 +53,14 @@ async def create_job_generator_graph() -> StateGraph:
     workflow = StateGraph(JobGeneratorState)
     
     # Add nodes
+    workflow.add_node("summarize", summarize_messages)  # Middleware for context management
     workflow.add_node("agent", call_model)
     workflow.add_node("tools", ToolNode([save_job_to_database]))
     
     # Define edges
-    workflow.add_edge(START, "agent")
+    # First, check if summarization is needed
+    workflow.add_edge(START, "summarize")
+    workflow.add_edge("summarize", "agent")
     
     # Conditional routing: agent -> tools (if tool calls) or END
     workflow.add_conditional_edges(

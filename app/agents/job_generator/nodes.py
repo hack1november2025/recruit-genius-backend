@@ -1,5 +1,5 @@
 """Node functions for job generator agent."""
-from langchain_core.messages import AIMessage, SystemMessage, trim_messages
+from langchain_core.messages import AIMessage, SystemMessage, HumanMessage, trim_messages, RemoveMessage
 from langchain_openai import ChatOpenAI
 from app.agents.job_generator.state import JobGeneratorState
 from app.agents.job_generator.tools import save_job_to_database
@@ -16,6 +16,13 @@ llm = ChatOpenAI(
     openai_api_key=settings.openai_api_key
 )
 llm_with_tools = llm.bind_tools([save_job_to_database])
+
+# Summarization LLM (same model, but for summarization)
+summarization_llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0,  # Lower temperature for consistent summaries
+    openai_api_key=settings.openai_api_key
+)
 
 
 # System prompt for the job generator agent
@@ -48,27 +55,76 @@ Remember: Maintain context! Keep refining the SAME job description unless user s
 Remember: Maintain context! Keep refining the SAME job description unless user starts a completely new request."""
 
 
-def trim_messages_middleware(state: JobGeneratorState) -> dict:
-    """Trim messages to keep conversation within context window."""
+async def summarize_messages(state: JobGeneratorState) -> dict:
+    """
+    Summarization middleware: When conversation gets too long, summarize old messages.
+    
+    This prevents context window overflow by:
+    1. Keeping recent messages intact (last 6 messages)
+    2. Summarizing older messages into a single summary
+    3. Always preserving the system message
+    
+    Triggered when message count exceeds threshold.
+    """
     messages = state["messages"]
     
-    # Keep system message + last 10 messages
-    if len(messages) <= 11:
+    # Threshold: summarize if we have more than 12 messages
+    # (system + 1 summary + 10 recent messages)
+    if len(messages) <= 12:
         return {}
     
-    # Trim but keep system message
-    from langchain_core.messages import trim_messages
+    llm_logger.info(f"Summarizing conversation: {len(messages)} messages")
     
-    trimmed = trim_messages(
-        messages,
-        max_tokens=4000,
-        strategy="last",
-        token_counter=len,  # Simple token counter
-        include_system=True,
+    # Separate system message, old messages, and recent messages
+    system_msg = messages[0] if isinstance(messages[0], SystemMessage) else None
+    start_idx = 1 if system_msg else 0
+    
+    # Keep last 6 messages (3 exchanges), summarize the rest
+    messages_to_summarize = messages[start_idx:-6]
+    recent_messages = messages[-6:]
+    
+    if not messages_to_summarize:
+        return {}
+    
+    # Create summary prompt
+    summary_prompt = f"""Condense this job description conversation into a brief summary.
+Focus on:
+- What job was being created/modified
+- Key requirements and changes requested
+- Current state of the job description
+
+Conversation to summarize:
+{chr(10).join([f"{m.type}: {m.content[:200]}..." if len(m.content) > 200 else f"{m.type}: {m.content}" for m in messages_to_summarize])}
+
+Provide a concise summary (2-3 sentences):"""
+    
+    # Get summary from LLM
+    summary_response = await summarization_llm.ainvoke([HumanMessage(content=summary_prompt)])
+    summary_text = summary_response.content
+    
+    llm_logger.info(f"Created summary: {summary_text[:100]}...")
+    
+    # Build new message list:
+    # 1. System message (if exists)
+    # 2. Summary message
+    # 3. Recent messages
+    new_messages = []
+    if system_msg:
+        new_messages.append(system_msg)
+    
+    # Add summary as a human message labeled as summary
+    new_messages.append(
+        HumanMessage(
+            content=f"[Previous conversation summary]: {summary_text}"
+        )
     )
     
-    llm_logger.debug(f"Trimmed messages from {len(messages)} to {len(trimmed)}")
-    return {"messages": trimmed}
+    # Add recent messages
+    new_messages.extend(recent_messages)
+    
+    llm_logger.info(f"Reduced messages from {len(messages)} to {len(new_messages)}")
+    
+    return {"messages": new_messages}
 
 
 async def call_model(state: JobGeneratorState) -> dict:

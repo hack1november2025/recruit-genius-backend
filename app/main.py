@@ -1,9 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
-from app.api.routes import health, candidates, jobs, matches
+from app.api.routes import health, candidates, jobs, matches, job_descriptions
 
 settings = get_settings()
+
+# Constants
+API_V1_PREFIX = "/api/v1"
 
 # Create FastAPI app
 app = FastAPI(
@@ -23,10 +26,11 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(health.router, prefix="/api/v1")
-app.include_router(candidates.router, prefix="/api/v1")
-app.include_router(jobs.router, prefix="/api/v1")
-app.include_router(matches.router, prefix="/api/v1")
+app.include_router(health.router, prefix=API_V1_PREFIX)
+app.include_router(candidates.router, prefix=API_V1_PREFIX)
+app.include_router(job_descriptions.router, prefix=API_V1_PREFIX)  # New: AI job generation
+app.include_router(jobs.router, prefix=API_V1_PREFIX)  # Standard CRUD
+app.include_router(matches.router, prefix=API_V1_PREFIX)
 
 
 @app.on_event("startup")

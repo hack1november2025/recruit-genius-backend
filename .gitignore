@@ -44,3 +44,4 @@ alembic/versions/*.py
 
 .github
 docs
+specifications

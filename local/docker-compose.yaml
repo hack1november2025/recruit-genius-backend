@@ -1,26 +1,41 @@
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: speaksy-postgres
+    image: pgvector/pgvector:pg16
+    container_name: recruitment-postgres
     environment:
-      POSTGRES_DB: speaksy
-      POSTGRES_USER: speaksy
-      POSTGRES_PASSWORD: speaksy_dev
+      POSTGRES_DB: recruitment_db
+      POSTGRES_USER: hrmanager
+      POSTGRES_PASSWORD: hrmanager_dev
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    command: postgres -c shared_preload_libraries=vector
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U speaksy"]
+      test: ["CMD-SHELL", "pg_isready -U hrmanager"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: recruitment-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: speaksy-pgadmin
+    container_name: recruitment-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@speaksy.com
+      PGADMIN_DEFAULT_EMAIL: admin@hrmanager.com
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
@@ -32,27 +47,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: speaksy-rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: speaksy
-      RABBITMQ_DEFAULT_PASS: speaksy_dev
-    ports:
-      - "5672:5672"   # AMQP port
-      - "15672:15672" # Management UI
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
   postgres-data:
-    name: speaksy-postgres-data
+    name: recruitment-postgres-data
   pgadmin-data:
-    name: speaksy-pgadmin-data
-  rabbitmq-data:
-    name: speaksy-rabbitmq-data
+    name: recruitment-pgadmin-data
+  redis-data:
+    name: recruitment-redis-data

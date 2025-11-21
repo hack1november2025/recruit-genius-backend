@@ -16,12 +16,9 @@ class Job(Base, TimestampMixin):
     __tablename__ = "jobs"
     
     title = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=False)  # Full AI-generated description
     department = Column(String(100), nullable=True, index=True)
     location = Column(String(255), nullable=True)
-    description = Column(Text, nullable=False)
-    requirements = Column(Text, nullable=False)
-    required_skills = Column(JSON, default=list, nullable=False)  # List of skills
-    experience_required = Column(String(50), nullable=True)
     salary_range = Column(String(100), nullable=True)
     status = Column(
         SQLEnum(JobStatus),
@@ -29,4 +26,4 @@ class Job(Base, TimestampMixin):
         nullable=False,
         index=True
     )
-    additional_info = Column(JSON, nullable=True)
+    additional_metadata = Column(JSON, nullable=True)  # Store generation metadata, skills, etc.

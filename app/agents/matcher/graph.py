@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.matcher.state import MatcherState
 from app.agents.matcher.nodes import (
     retrieve_job_node,
-    build_filters_node,
-    hybrid_search_node,
+    rag_search_node,
+    calculate_metrics_node,
     score_candidates_node
 )
 from app.core.logging import rag_logger
@@ -23,12 +23,12 @@ def create_matcher_graph(db: AsyncSession) -> StateGraph:
     """
     Create and compile the matcher agent graph.
     
-    The workflow:
+    The workflow (RAG-first approach):
     1. START -> retrieve_job: Fetch job data, embeddings, and metadata
-    2. retrieve_job -> build_filters: Extract hard constraints from job requirements
-    3. build_filters -> hybrid_search: Perform vector similarity + metadata filtering
-    4. hybrid_search -> score_candidates: Calculate match scores and rank candidates
-    5. score_candidates -> END: Return final results
+    2. retrieve_job -> rag_search: Perform vector similarity search (no filters, wide net)
+    3. rag_search -> calculate_metrics: Calculate 8 comprehensive metrics for each CV
+    4. calculate_metrics -> score_candidates: Rank candidates by composite scores
+    5. score_candidates -> END: Return final results with all metrics
     
     Error handling:
     - If error occurs at any step, subsequent steps are skipped
@@ -42,10 +42,10 @@ def create_matcher_graph(db: AsyncSession) -> StateGraph:
     """
     workflow = StateGraph(MatcherState)
     
-    # Add nodes with database injection
+    # Add nodes with database injection where needed
     workflow.add_node("retrieve_job", create_db_node(retrieve_job_node, db))
-    workflow.add_node("build_filters", build_filters_node)
-    workflow.add_node("hybrid_search", create_db_node(hybrid_search_node, db))
+    workflow.add_node("rag_search", create_db_node(rag_search_node, db))
+    workflow.add_node("calculate_metrics", create_db_node(calculate_metrics_node, db))
     workflow.add_node("score_candidates", score_candidates_node)
     
     # Define edges
@@ -62,15 +62,22 @@ def create_matcher_graph(db: AsyncSession) -> StateGraph:
         "retrieve_job",
         check_error,
         {
-            "continue": "build_filters",
+            "continue": "rag_search",
             "end": END
         }
     )
     
-    workflow.add_edge("build_filters", "hybrid_search")
+    workflow.add_conditional_edges(
+        "rag_search",
+        check_error,
+        {
+            "continue": "calculate_metrics",
+            "end": END
+        }
+    )
     
     workflow.add_conditional_edges(
-        "hybrid_search",
+        "calculate_metrics",
         check_error,
         {
             "continue": "score_candidates",
@@ -83,7 +90,7 @@ def create_matcher_graph(db: AsyncSession) -> StateGraph:
     # Compile the graph
     compiled_graph = workflow.compile()
     
-    rag_logger.info("Matcher agent graph compiled successfully")
+    rag_logger.info("Matcher agent graph compiled successfully (RAG-first with metrics)")
     
     return compiled_graph
 

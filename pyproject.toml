@@ -28,6 +28,7 @@ dependencies = [
     "tiktoken>=0.5.0",
     "python-magic>=0.4.27",
     "langdetect>=1.0.9",
+    "python-dateutil>=2.9.0",
 ]
 
 [project.optional-dependencies]

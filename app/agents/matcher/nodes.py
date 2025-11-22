@@ -8,6 +8,8 @@ from app.db.models.job import Job
 from app.db.models.job_embedding import JobEmbedding
 from app.db.models.job_metadata import JobMetadata
 from app.repositories.hybrid_search import HybridSearchRepository
+from app.repositories.cv_metrics import CVMetricsRepository
+from app.services.cv_metrics_calculator import CVMetricsCalculator
 from app.core.logging import rag_logger
 
 
@@ -93,75 +95,13 @@ async def retrieve_job_node(state: MatcherState, db: AsyncSession) -> Dict[str, 
         }
 
 
-def build_filters_node(state: MatcherState) -> Dict[str, Any]:
-    """
-    Build metadata filters from job requirements and overrides.
-    
-    Args:
-        state: Current matcher state
-        
-    Returns:
-        Updated state with metadata filters
-    """
-    if state.get("error"):
-        return {}
-    
-    job_metadata = state.get("job_metadata", {})
-    overrides = state.get("hard_constraints_overrides", {})
-    
-    # Build filters combining job metadata and overrides
-    filters = {}
-    
-    # Required skills (MUST HAVE)
-    required_skills = overrides.get("required_skills") or job_metadata.get("required_skills", [])
-    if required_skills:
-        filters["required_skills"] = required_skills
-    
-    # Minimum experience
-    min_exp = overrides.get("min_experience_years") or job_metadata.get("min_experience_years")
-    if min_exp is not None:
-        filters["min_experience_years"] = min_exp
-    
-    # Seniority level
-    seniority = overrides.get("seniority_level") or job_metadata.get("seniority_level")
-    if seniority:
-        # Accept same level or higher
-        seniority_hierarchy = ["junior", "mid", "senior", "lead", "principal"]
-        if seniority.lower() in seniority_hierarchy:
-            idx = seniority_hierarchy.index(seniority.lower())
-            filters["seniority_level"] = seniority_hierarchy[idx:]  # Current and above
-    
-    # Languages (from full_metadata if available)
-    languages = overrides.get("languages") or job_metadata.get("full_metadata", {}).get("languages_required", [])
-    if languages:
-        filters["languages"] = languages
-    
-    # Remote type
-    remote_type = overrides.get("remote_type") or job_metadata.get("remote_type")
-    if remote_type:
-        # Allow flexible matching - remote can work for hybrid, etc.
-        if remote_type.lower() == "onsite":
-            filters["remote_type"] = ["onsite", "hybrid"]
-        elif remote_type.lower() == "hybrid":
-            filters["remote_type"] = ["remote", "hybrid", "onsite"]
-        elif remote_type.lower() == "remote":
-            filters["remote_type"] = ["remote", "hybrid"]
-    
-    # Locations
-    locations = overrides.get("locations") or job_metadata.get("locations", [])
-    if locations:
-        filters["locations"] = locations
-    
-    rag_logger.info(f"Built metadata filters: {filters}")
-    
-    return {
-        "metadata_filters": filters
-    }
 
 
-async def hybrid_search_node(state: MatcherState, db: AsyncSession) -> Dict[str, Any]:
+
+async def rag_search_node(state: MatcherState, db: AsyncSession) -> Dict[str, Any]:
     """
-    Perform hybrid search for candidates.
+    Perform RAG-only vector similarity search (no metadata filters).
+    Casts a wide net to find semantically similar candidates.
     
     Args:
         state: Current matcher state
@@ -174,8 +114,7 @@ async def hybrid_search_node(state: MatcherState, db: AsyncSession) -> Dict[str,
         return {}
     
     job_embedding = state.get("job_embedding")
-    metadata_filters = state.get("metadata_filters", {})
-    top_k = state.get("top_k", 20)
+    top_k = state.get("top_k", 50)  # Wide net - get more candidates
     
     if not job_embedding:
         return {
@@ -185,15 +124,14 @@ async def hybrid_search_node(state: MatcherState, db: AsyncSession) -> Dict[str,
     try:
         repo = HybridSearchRepository(db)
         
-        # Perform hybrid search
+        # Perform RAG-only search
         candidates = await repo.search_candidates(
             query_embedding=job_embedding,
-            metadata_filters=metadata_filters,
             top_k=top_k,
-            similarity_threshold=0.5  # Minimum 50% semantic similarity
+            similarity_threshold=0.3  # Lower threshold to cast wider net
         )
         
-        rag_logger.info(f"Hybrid search found {len(candidates)} candidates")
+        rag_logger.info(f"RAG search found {len(candidates)} candidates")
         
         return {
             "candidate_results": candidates,
@@ -201,21 +139,96 @@ async def hybrid_search_node(state: MatcherState, db: AsyncSession) -> Dict[str,
         }
         
     except Exception as e:
-        rag_logger.error(f"Hybrid search failed: {str(e)}")
+        rag_logger.error(f"RAG search failed: {str(e)}")
         return {
-            "error": f"Hybrid search failed: {str(e)}"
+            "error": f"RAG search failed: {str(e)}"
+        }
+
+
+async def calculate_metrics_node(state: MatcherState, db: AsyncSession) -> Dict[str, Any]:
+    """
+    Calculate comprehensive metrics for each candidate CV against the job.
+    Persists metrics to database for tracking and analysis.
+    
+    Args:
+        state: Current matcher state with candidate_results
+        db: Database session
+        
+    Returns:
+        Updated state with metrics attached to candidates
+    """
+    if state.get("error"):
+        return {}
+    
+    candidate_results = state.get("candidate_results", [])
+    job_id = state["job_id"]
+    job_metadata = state.get("job_metadata", {})
+    job_text = state.get("job_text", "")
+    
+    if not candidate_results:
+        rag_logger.info("No candidates to calculate metrics for")
+        return {
+            "candidate_results": [],
+        }
+    
+    try:
+        calculator = CVMetricsCalculator()
+        metrics_repo = CVMetricsRepository(db)
+        
+        enhanced_candidates = []
+        
+        for result in candidate_results:
+            cv_id = result["cv_id"]
+            cv_metadata = result.get("cv_metadata", {})
+            cv_text = result.get("cv_text", "")
+            similarity_score = result["similarity_score"]
+            
+            rag_logger.info(f"Calculating metrics for CV {cv_id}")
+            
+            # Calculate all 8 metrics
+            metrics = calculator.calculate_all_metrics(
+                cv_metadata=cv_metadata,
+                cv_text=cv_text,
+                job_metadata=job_metadata,
+                job_text=job_text,
+                semantic_similarity=similarity_score
+            )
+            
+            # Persist metrics to database
+            await metrics_repo.upsert_metrics(
+                cv_id=cv_id,
+                job_id=job_id,
+                metrics_data=metrics
+            )
+            
+            # Add metrics to candidate result
+            result["metrics"] = metrics
+            enhanced_candidates.append(result)
+        
+        rag_logger.info(f"Calculated and persisted metrics for {len(enhanced_candidates)} candidates")
+        
+        return {
+            "candidate_results": enhanced_candidates,
+            "error": None,
+        }
+        
+    except Exception as e:
+        rag_logger.error(f"Metrics calculation failed: {str(e)}")
+        return {
+            "error": f"Metrics calculation failed: {str(e)}"
         }
 
 
 def score_candidates_node(state: MatcherState) -> Dict[str, Any]:
     """
-    Score and rank candidates based on match quality.
+    Score and rank candidates based on comprehensive metrics.
+    Uses the calculated metrics from calculate_metrics_node.
     
     Args:
-        state: Current matcher state
+        state: Current matcher state with metrics-enhanced candidates
         
     Returns:
-        Updated state with scored candidates and summary
+        Updated state with scored, ranked candidates and summary
     """
     if state.get("error"):
         return {}
@@ -231,47 +244,64 @@ def score_candidates_node(state: MatcherState) -> Dict[str, Any]:
                 "primary_stack_or_domain": ", ".join(job_metadata.get("tech_stack", [])[:3]) or "General",
                 "key_required_skills": job_metadata.get("required_skills", [])[:10],
                 "nice_to_have_skills": job_metadata.get("preferred_skills", [])[:10],
-                "hard_constraints_applied": _format_constraints(state.get("metadata_filters", {}))
+                "hard_constraints_applied": ["RAG-only search (no hard filters)"]
             }
         }
     
-    # Score each candidate
+    # Format candidates with metrics
     scored_candidates = []
     for result in candidate_results:
         candidate = result["candidate"]
         cv_metadata = result.get("cv_metadata", {})
-        similarity_score = result["similarity_score"]
-        
-        # Calculate detailed match breakdown
-        match_breakdown = _calculate_match_score(
-            job_metadata=job_metadata,
-            cv_metadata=cv_metadata,
-            similarity_score=similarity_score
-        )
+        metrics = result.get("metrics", {})
         
         scored_candidates.append({
             "candidate_id": candidate.id,
             "cv_id": result["cv_id"],
             "name": cv_metadata.get("name") or candidate.name,
             "current_role": cv_metadata.get("current_role", "Not specified"),
-            "match_score": match_breakdown["match_score"],
-            "hybrid_similarity_score": similarity_score,
-            "matched_skills": match_breakdown["matched_skills"],
-            "missing_required_skills": match_breakdown["missing_required_skills"],
-            "nice_to_have_skills_covered": match_breakdown["nice_to_have_covered"],
-            "seniority_match": match_breakdown["seniority_match"],
-            "experience": match_breakdown["experience"],
-            "location_match": match_breakdown["location_match"],
-            "language_match": match_breakdown["language_match"],
-            "other_relevant_factors": match_breakdown["other_factors"],
-            "overall_rationale": match_breakdown["rationale"],
+            
+            # Overall scores
+            "match_score": metrics.get("composite_score", 0),
+            "hybrid_similarity_score": result["similarity_score"],
+            
+            # Core Fit Metrics
+            "skills_match_score": metrics.get("skills_match_score", 0),
+            "experience_relevance_score": metrics.get("experience_relevance_score", 0),
+            "education_fit_score": metrics.get("education_fit_score", 0),
+            
+            # Quality Metrics
+            "achievement_impact_score": metrics.get("achievement_impact_score", 0),
+            "keyword_density_score": metrics.get("keyword_density_score", 0),
+            
+            # Risk/Confidence Metrics
+            "employment_gap_score": metrics.get("employment_gap_score", 0),
+            "readability_score": metrics.get("readability_score", 0),
+            "ai_confidence_score": metrics.get("ai_confidence_score", 0),
+            
+            # Additional context
+            "experience": {
+                "total_years_experience": cv_metadata.get("total_years_experience", 0),
+                "relevant_experience_years": cv_metadata.get("total_years_experience", 0),
+                "relevant_summary": cv_metadata.get("summary", "No summary available")[:200]
+            },
+            "seniority_match": cv_metadata.get("seniority_level", "Unknown"),
+            "location_match": {
+                "candidate_location": cv_metadata.get("country", ""),
+                "candidate_city": cv_metadata.get("city", ""),
+                "compatible": True  # RAG-only doesn't filter by location
+            },
+            
+            # Rationale based on metrics
+            "overall_rationale": _build_rationale_from_metrics(metrics, cv_metadata, job_metadata),
+            "metrics_details": metrics.get("metric_details", {}),
         })
     
-    # Sort by match_score descending
+    # Sort by composite_score descending
     scored_candidates.sort(key=lambda x: x["match_score"], reverse=True)
     
-    # Take top_k
-    top_k = state.get("top_k", 10)
+    # Take top matches for final output
+    top_k = min(state.get("top_k", 10), 10)  # Cap at 10 for final results
     final_matches = scored_candidates[:top_k]
     
     rag_logger.info(f"Scored {len(scored_candidates)} candidates, returning top {len(final_matches)}")
@@ -282,7 +312,9 @@ def score_candidates_node(state: MatcherState) -> Dict[str, Any]:
         "primary_stack_or_domain": ", ".join(job_metadata.get("tech_stack", [])[:3]) or "General",
         "key_required_skills": job_metadata.get("required_skills", [])[:10],
         "nice_to_have_skills": job_metadata.get("preferred_skills", [])[:10],
-        "hard_constraints_applied": _format_constraints(state.get("metadata_filters", {})),
+        "hard_constraints_applied": ["RAG-only search (no upfront filtering, all metrics calculated)"],
+        "total_candidates_evaluated": len(candidate_results),
+        "top_candidates_returned": len(final_matches),
     }
     
     return {
@@ -290,6 +322,46 @@ def score_candidates_node(state: MatcherState) -> Dict[str, Any]:
         "summary": summary,
         "error": None,
     }
+
+
+def _build_rationale_from_metrics(
+    metrics: Dict[str, Any],
+    cv_metadata: Dict[str, Any],
+    job_metadata: Dict[str, Any]
+) -> str:
+    """Build human-readable rationale from calculated metrics."""
+    parts = []
+    
+    composite = metrics.get("composite_score", 0)
+    skills_match = metrics.get("skills_match_score", 0)
+    experience = metrics.get("experience_relevance_score", 0)
+    confidence = metrics.get("ai_confidence_score", 0)
+    
+    # Overall fit
+    if composite >= 80:
+        parts.append(f"Excellent overall match ({composite:.0f}%).")
+    elif composite >= 60:
+        parts.append(f"Good overall match ({composite:.0f}%).")
+    else:
+        parts.append(f"Moderate match ({composite:.0f}%).")
+    
+    # Skills
+    if skills_match >= 80:
+        parts.append(f"Strong skills alignment ({skills_match:.0f}%).")
+    elif skills_match >= 60:
+        parts.append(f"Reasonable skills match ({skills_match:.0f}%).")
+    else:
+        parts.append(f"Limited skills overlap ({skills_match:.0f}%).")
+    
+    # Experience
+    years = cv_metadata.get("total_years_experience", 0)
+    parts.append(f"{years} years experience (relevance score: {experience:.1f}/10).")
+    
+    # Confidence
+    if confidence < 80:
+        parts.append(f"Note: AI extraction confidence at {confidence:.0f}%.")
+    
+    return " ".join(parts)
 
 
 def _average_embeddings(embeddings: List[List[float]]) -> List[float]:

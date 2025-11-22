@@ -21,72 +21,54 @@ router = APIRouter(prefix="/jobs", tags=["matching"])
 
 @router.post(
     "/{job_id}/match",
-    response_model=MatcherResponse,
     status_code=status.HTTP_200_OK,
     summary="Find best matching candidates for a job",
     description="""
-    Performs hybrid search (semantic + metadata filtering) to find the best candidates 
-    for a given job opening.
+    Performs RAG-first search with comprehensive metrics calculation to find the best candidates.
     
     The matching process:
     1. Retrieves job description, embeddings, and metadata
-    2. Applies hard constraints (required skills, experience, location, etc.)
-    3. Performs vector similarity search over candidate CVs
-    4. Scores and ranks candidates based on multiple dimensions
-    5. Returns top-k candidates with detailed match breakdown
+    2. Performs vector similarity search (RAG-only, no upfront filtering)
+    3. Calculates 8 comprehensive metrics for each candidate
+    4. Ranks candidates by composite score
+    5. Returns top-k candidates with all metrics
     
-    **Match Score Calculation:**
-    - Semantic similarity (30%)
-    - Required skills match (40%)
-    - Experience alignment (15%)
-    - Seniority match (10%)
-    - Nice-to-have skills (5%)
-    
-    **Hard Constraints:**
-    Candidates failing hard constraints are automatically filtered out:
-    - Required skills
-    - Minimum experience years
-    - Seniority level
-    - Language requirements
-    - Location/remote type
+    **Metrics Calculated (8):**
+    - Core Fit: Skills match, Experience relevance, Education fit
+    - Quality: Achievement impact, Keyword density
+    - Risk/Confidence: Employment gaps, Readability, AI confidence
+    - Composite score (weighted combination)
     """
 )
 async def match_candidates_for_job(
     job_id: int,
-    request: MatcherRequest | None = None,
+    top_k: int = 10,
     db: AsyncSession = Depends(get_db)
-) -> MatcherResponse:
+) -> dict:
     """
     Find and rank the best matching candidates for a job.
     
     Args:
         job_id: Job ID to match candidates against
-        request: Optional matching parameters (top_k, constraints, etc.)
+        top_k: Maximum number of candidates to return
         db: Database session
         
     Returns:
-        Ranked list of matching candidates with detailed breakdown
+        Ranked list of matching candidates with detailed metrics
         
     Raises:
         HTTPException: If job not found or matching fails
     """
-    # Use defaults if no request body provided
-    if request is None:
-        request = MatcherRequest(job_id=job_id)
-    
-    # Ensure job_id matches
-    request.job_id = job_id
-    
     rag_logger.info(f"Matching candidates for job {job_id}")
     
     try:
         # Execute matching workflow
         matcher_service = MatcherService(db)
         result = await matcher_service.find_matches_for_job(
-            job_id=request.job_id,
-            top_k=request.top_k,
-            hard_constraints_overrides=request.hard_constraints_overrides,
-            persist_matches=request.persist_matches
+            job_id=job_id,
+            top_k=top_k,
+            hard_constraints_overrides=None,
+            persist_matches=True
         )
         
         # Check for errors
@@ -103,34 +85,8 @@ async def match_candidates_for_job(
                     detail=error_msg
                 )
         
-        # Parse and validate response
-        summary = MatcherSummary(**result["summary"])
-        
-        candidates = []
-        for candidate_data in result["candidates"]:
-            candidate = CandidateMatch(
-                candidate_id=candidate_data["candidate_id"],
-                name=candidate_data["name"],
-                current_role=candidate_data["current_role"],
-                match_score=candidate_data["match_score"],
-                hybrid_similarity_score=candidate_data["hybrid_similarity_score"],
-                matched_skills=candidate_data["matched_skills"],
-                missing_required_skills=candidate_data["missing_required_skills"],
-                nice_to_have_skills_covered=candidate_data["nice_to_have_skills_covered"],
-                seniority_match=candidate_data["seniority_match"],
-                experience=ExperienceInfo(**candidate_data["experience"]),
-                location_match=LocationMatchInfo(**candidate_data["location_match"]),
-                language_match=LanguageMatchInfo(**candidate_data["language_match"]),
-                other_relevant_factors=candidate_data["other_relevant_factors"],
-                overall_rationale=candidate_data["overall_rationale"]
-            )
-            candidates.append(candidate)
-        
-        return MatcherResponse(
-            job_id=job_id,
-            summary=summary,
-            candidates=candidates
-        )
+        # Return raw result with all metrics
+        return result
         
     except HTTPException:
         raise
@@ -144,7 +100,6 @@ async def match_candidates_for_job(
 
 @router.get(
     "/{job_id}/match",
-    response_model=MatcherResponse,
     status_code=status.HTTP_200_OK,
     summary="Find matching candidates (GET method)",
     description="Alternative GET endpoint for finding matches with default parameters."
@@ -153,7 +108,7 @@ async def match_candidates_get(
     job_id: int,
     top_k: int = 10,
     db: AsyncSession = Depends(get_db)
-) -> MatcherResponse:
+) -> dict:
     """
     GET endpoint for matching candidates with default parameters.
     
@@ -163,7 +118,6 @@ async def match_candidates_get(
         db: Database session
         
     Returns:
-        Ranked list of matching candidates
+        Ranked list of matching candidates with metrics
     """
-    request = MatcherRequest(job_id=job_id, top_k=top_k)
-    return await match_candidates_for_job(job_id, request, db)
+    return await match_candidates_for_job(job_id, top_k, db)

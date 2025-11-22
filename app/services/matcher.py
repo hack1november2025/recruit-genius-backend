@@ -53,7 +53,7 @@ class MatcherService:
         
         Args:
             job_id: Job ID
-            candidates: List of matched candidates with scores
+            candidates: List of matched candidates with comprehensive metrics
         """
         try:
             for candidate in candidates:
@@ -62,15 +62,29 @@ class MatcherService:
                     candidate_id=candidate["candidate_id"],
                     match_score=candidate["match_score"],
                     reasoning=candidate["overall_rationale"],
-                    matching_skills=candidate["matched_skills"],
-                    missing_skills=candidate["missing_required_skills"],
+                    matching_skills=[],  # Not extracted in new format
+                    missing_skills=[],  # Not extracted in new format
                     ai_insights={
-                        "seniority_match": candidate["seniority_match"],
-                        "experience": candidate["experience"],
-                        "location_match": candidate["location_match"],
-                        "language_match": candidate["language_match"],
-                        "other_factors": candidate["other_relevant_factors"],
-                        "similarity_score": candidate["hybrid_similarity_score"],
+                        # Core metrics
+                        "skills_match_score": candidate.get("skills_match_score", 0),
+                        "experience_relevance_score": candidate.get("experience_relevance_score", 0),
+                        "education_fit_score": candidate.get("education_fit_score", 0),
+                        
+                        # Quality metrics
+                        "achievement_impact_score": candidate.get("achievement_impact_score", 0),
+                        "keyword_density_score": candidate.get("keyword_density_score", 0),
+                        
+                        # Risk/confidence metrics
+                        "employment_gap_score": candidate.get("employment_gap_score", 0),
+                        "readability_score": candidate.get("readability_score", 0),
+                        "ai_confidence_score": candidate.get("ai_confidence_score", 0),
+                        
+                        # Additional context
+                        "seniority_match": candidate.get("seniority_match", "Unknown"),
+                        "experience": candidate.get("experience", {}),
+                        "location_match": candidate.get("location_match", {}),
+                        "similarity_score": candidate.get("hybrid_similarity_score", 0),
+                        "metrics_details": candidate.get("metrics_details", {}),
                     }
                 )
             

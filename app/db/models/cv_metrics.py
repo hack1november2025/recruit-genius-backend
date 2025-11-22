@@ -10,7 +10,7 @@ class CVMetrics(Base):
     __tablename__ = "cv_metrics"
     
     id = Column(Integer, primary_key=True, index=True)
-    candidate_id = Column(Integer, ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True)
+    cv_id = Column(Integer, ForeignKey("cvs.id", ondelete="CASCADE"), nullable=False, index=True)
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=True, index=True)
     
     # Core Fit Metrics
@@ -36,5 +36,5 @@ class CVMetrics(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     __table_args__ = (
-        UniqueConstraint('candidate_id', 'job_id', name='unique_candidate_job_metrics'),
+        UniqueConstraint('cv_id', 'job_id', name='unique_cv_job_metrics'),
     )

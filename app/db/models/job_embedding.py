@@ -1,19 +1,19 @@
-"""CV Embeddings model for vector search."""
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON, DateTime
+"""Job Embeddings model for vector search."""
+from sqlalchemy import Column, Integer, Text, ForeignKey, JSON, DateTime
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
 from app.db.base import Base
 
 
-class CVEmbedding(Base):
-    """CV text chunks with vector embeddings for semantic search."""
+class JobEmbedding(Base):
+    """Job description chunks with vector embeddings for semantic search."""
     
-    __tablename__ = "cv_embeddings"
+    __tablename__ = "job_embeddings"
     
     id = Column(Integer, primary_key=True, index=True)
-    cv_id = Column(Integer, ForeignKey("cvs.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     chunk_index = Column(Integer, nullable=False)
-    chunk_text = Column(Text, nullable=False)  # English translated text
+    chunk_text = Column(Text, nullable=False)
     embedding = Column(Vector(1536), nullable=False)  # OpenAI text-embedding-3-small dimension
     embedding_metadata = Column(JSON, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
-from app.api.routes import health, candidates, jobs, matches, job_descriptions
+from app.api.routes import health, candidates, jobs, matches, job_descriptions, cvs
 
 settings = get_settings()
 
@@ -28,6 +28,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, prefix=API_V1_PREFIX)
 app.include_router(candidates.router, prefix=API_V1_PREFIX)
+app.include_router(cvs.router, prefix=API_V1_PREFIX)  # New: CV upload and processing
 app.include_router(job_descriptions.router, prefix=API_V1_PREFIX)  # New: AI job generation
 app.include_router(jobs.router, prefix=API_V1_PREFIX)  # Standard CRUD
 app.include_router(matches.router, prefix=API_V1_PREFIX)

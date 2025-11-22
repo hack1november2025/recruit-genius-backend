@@ -1,14 +1,11 @@
-"""LangGraph workflow for CV Chat agent."""
-from typing import Callable
+"""LangGraph workflow for CV Chat agent using agentic RAG pattern."""
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.prebuilt import create_react_agent
 from sqlalchemy.ext.asyncio import AsyncSession
+from langchain_openai import ChatOpenAI
 from app.agents.cv_chat.state import CVChatState
-from app.agents.cv_chat.nodes import (
-    understand_query_node,
-    retrieve_candidates_node,
-    generate_response_node
-)
+from app.agents.cv_chat.tools import get_cv_chat_tools
 from app.core.config import get_settings
 from app.core.logging import rag_logger
 import psycopg
@@ -16,13 +13,6 @@ import psycopg
 
 # Global checkpointer instance to keep connection alive
 _checkpointer = None
-
-
-def create_db_node(node_func: Callable, db: AsyncSession) -> Callable:
-    """Wrapper to inject database session into node functions."""
-    async def wrapped(state: CVChatState) -> dict:
-        return await node_func(state, db)
-    return wrapped
 
 
 async def get_checkpointer() -> AsyncPostgresSaver:
@@ -51,157 +41,136 @@ async def get_checkpointer() -> AsyncPostgresSaver:
     return _checkpointer
 
 
-def create_cv_chat_graph(db: AsyncSession) -> StateGraph:
+def create_cv_chat_agent():
     """
-    Create the CV chat agent graph (NOT compiled - compilation happens with checkpointer).
+    Create agentic RAG agent using LangChain's react pattern.
     
-    Workflow:
-    1. START -> understand_query: Analyze user query and extract intent/parameters
-    2. understand_query -> check_clarification: Determine if clarification needed
-       - If needs clarification -> generate_response (with clarification message)
-       - If clear -> retrieve_candidates
-    3. retrieve_candidates -> generate_response: Get candidates and generate response
-    4. generate_response -> END: Return final response
+    This follows LangChain's recommended agentic RAG approach where:
+    - The LLM decides when to use retrieval tools
+    - Tools are simple, focused functions decorated with @tool
+    - The agent reasons step-by-step and calls tools as needed
     
-    The agent maintains conversation context through the messages list,
-    enabling multi-turn conversations and query refinement.
-    
-    Args:
-        db: Database session for data access
-        
     Returns:
-        StateGraph ready for compilation with checkpointer
+        Agent executor (not yet compiled with checkpointer)
     """
-    workflow = StateGraph(CVChatState)
+    settings = get_settings()
     
-    # Add nodes with database injection
-    workflow.add_node("understand_query", create_db_node(understand_query_node, db))
-    workflow.add_node("retrieve_candidates", create_db_node(retrieve_candidates_node, db))
-    workflow.add_node("generate_response", create_db_node(generate_response_node, db))
+    # System prompt for the agent
+    system_prompt = """You are an expert HR assistant with access to a comprehensive CV database.
+
+Your role is to help HR personnel find and analyze candidate profiles using natural language.
+
+**Available Tools:**
+- search_candidates: Use this to find candidates based on skills, experience, job descriptions, or any natural language query
+  
+**Guidelines:**
+- When a user asks about candidates, ALWAYS use the search_candidates tool
+- Be conversational and professional
+- Summarize candidate information clearly
+- If no candidates match, suggest alternative search approaches
+- Maintain context from the conversation history
+- Provide actionable insights about candidates
+
+**Examples:**
+User: "Find me Java developers"
+Action: Call search_candidates with query="Java developers"
+
+User: "Show me senior Python engineers with 5+ years"
+Action: Call search_candidates with query="senior Python engineer 5 years experience"
+
+User: "Looking for data scientists in London"
+Action: Call search_candidates with query="data scientist London"
+
+Always call the search tool first before responding about candidates.
+"""
     
-    # Define edges
-    workflow.add_edge(START, "understand_query")
-    
-    # Conditional routing after query understanding
-    def route_after_understanding(state: CVChatState) -> str:
-        """Route based on whether clarification is needed or error occurred."""
-        rag_logger.info(f"Routing decision - Intent: {state.get('query_intent')}, Error: {state.get('error')}, Clarification: {state.get('requires_clarification')}")
-        
-        if state.get("error"):
-            rag_logger.info("Routing to generate_response (error)")
-            return "generate_response"
-        if state.get("requires_clarification"):
-            rag_logger.info("Routing to generate_response (clarification needed)")
-            return "generate_response"
-        if state.get("query_intent") == "clarify":
-            rag_logger.info("Routing to generate_response (clarify intent)")
-            return "generate_response"
-        
-        rag_logger.info("Routing to retrieve_candidates")
-        return "retrieve_candidates"
-    
-    workflow.add_conditional_edges(
-        "understand_query",
-        route_after_understanding,
-        {
-            "retrieve_candidates": "retrieve_candidates",
-            "generate_response": "generate_response"
-        }
+    # Create LLM with better model for reasoning
+    llm = ChatOpenAI(
+        model="gpt-4o",
+        temperature=0,
+        openai_api_key=settings.openai_api_key,
     )
     
-    # After retrieval, always generate response
-    workflow.add_edge("retrieve_candidates", "generate_response")
-    workflow.add_edge("generate_response", END)
+    # Get tools for the agent
+    tools = get_cv_chat_tools()
     
-    rag_logger.info("CV Chat agent graph structure created")
+    rag_logger.info(f"Creating CV chat agent with {len(tools)} tools")
     
-    return workflow
+    # Create agent using LangChain's react pattern
+    # The agent will automatically handle tool calling and reasoning
+    agent = create_react_agent(
+        model=llm,
+        tools=tools,
+        prompt=system_prompt,
+    )
+    
+    return agent
 
 
 async def run_cv_chat_workflow(
     user_query: str,
     thread_id: str,
-    user_identifier: str,
-    db: AsyncSession,
+    db: AsyncSession,  # noqa: ARG001 - kept for API compatibility
 ) -> dict:
     """
-    Execute the CV chat workflow for a user query.
+    Execute the CV chat workflow using agentic RAG.
     
-    Uses LangGraph's checkpointer to maintain conversation history per thread_id.
-    No need for separate session tables - checkpointer handles everything.
+    The agent decides when to use retrieval tools based on the query.
+    LangGraph's checkpointer maintains conversation history automatically.
     
     Args:
         user_query: User's natural language query
         thread_id: Unique thread ID for conversation persistence
-        user_identifier: User identifier (for logging/analytics)
-        db: Database session for candidate retrieval
+        db: Database session (for future use, currently tools access DB directly)
         
     Returns:
-        Dictionary with response text, structured data, and updated state
+        Dictionary with response text and metadata
     """
-    # Get checkpointer
-    checkpointer = await get_checkpointer()
-    
-    # Create graph structure
-    workflow = create_cv_chat_graph(db)
-    
-    # Compile with checkpointer (only compilation happens here)
-    compiled_graph = workflow.compile(checkpointer=checkpointer)
-    
-    rag_logger.info("CV Chat agent graph compiled with checkpointer")
-    
-    # Configuration for thread-based checkpointing
-    config = {
-        "configurable": {
-            "thread_id": thread_id
-        }
-    }
-    
-    # Get existing state from checkpointer (if any)
-    # This loads the conversation history automatically
-    existing_state = await compiled_graph.aget_state(config)
-    
-    # Get existing messages from checkpointed state
-    existing_messages = existing_state.values.get("messages", []) if existing_state.values else []
-    
-    # Prepare initial state (merges with existing via checkpointer)
-    from langchain_core.messages import HumanMessage
-    
-    initial_state: CVChatState = {
-        "messages": existing_messages + [HumanMessage(content=user_query)],
-        "user_identifier": user_identifier,
-        "user_query": user_query,
-        "query_intent": None,
-        "search_params": {},
-        "query_embedding": None,
-        "candidate_results": [],
-        "candidate_ids_in_context": existing_state.values.get("candidate_ids_in_context", []) if existing_state.values else [],
-        "response_text": None,
-        "structured_response": None,
-        "requires_clarification": False,
-        "clarification_message": None,
-        "error": None,
-    }
-    
     try:
-        rag_logger.info(f"Starting CV chat workflow for thread {thread_id}")
-        result = await compiled_graph.ainvoke(initial_state, config=config)
+        # Get checkpointer
+        await get_checkpointer()
         
-        # Extract key results
-        output = {
-            "thread_id": thread_id,
-            "response_text": result.get("response_text", ""),
-            "structured_response": result.get("structured_response", {}),
-            "candidate_ids": result.get("candidate_ids_in_context", []),
-            "messages": result.get("messages", []),
-            "error": result.get("error"),
+        # Create agent (returns already compiled graph)
+        agent = create_cv_chat_agent()
+        
+        # Configuration for thread-based checkpointing
+        config = {
+            "configurable": {
+                "thread_id": thread_id
+            }
         }
         
-        rag_logger.info(f"CV chat workflow completed for thread {thread_id}")
-        return output
+        # Prepare messages for the agent
+        from langchain_core.messages import HumanMessage
+        
+        input_messages = {"messages": [HumanMessage(content=user_query)]}
+        
+        rag_logger.info(f"Invoking CV chat agent for thread {thread_id}, query: {user_query[:100]}")
+        
+        # Invoke the agent
+        result = await agent.ainvoke(input_messages, config=config)
+        
+        # Extract response from agent messages
+        messages = result.get("messages", [])
+        last_message = messages[-1] if messages else None
+        
+        response_text = last_message.content if last_message else "I couldn't process your request."
+        
+        rag_logger.info(f"CV chat agent completed for thread {thread_id}")
+        
+        return {
+            "thread_id": thread_id,
+            "response_text": response_text,
+            "messages": messages,
+            "structured_response": {
+                "type": "chat_response",
+                "agent_used_tools": any(hasattr(msg, "tool_calls") and msg.tool_calls for msg in messages)
+            },
+            "error": None
+        }
         
     except Exception as e:
-        rag_logger.error(f"CV chat workflow exception: {str(e)}")
+        rag_logger.error(f"CV chat workflow exception: {str(e)}", exc_info=True)
         return {
             "thread_id": thread_id,
             "response_text": "I encountered an error processing your request. Please try again.",
@@ -209,7 +178,5 @@ async def run_cv_chat_workflow(
                 "type": "error",
                 "message": str(e)
             },
-            "candidate_ids": [],
-            "messages": [],
             "error": str(e)
         }

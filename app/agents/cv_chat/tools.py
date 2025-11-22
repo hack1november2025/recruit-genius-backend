@@ -1,239 +1,93 @@
-"""Tools for CV Chat agent - RAG retrieval and candidate operations."""
-from typing import List, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
-from app.db.models.candidate import Candidate
-from app.db.models.cv import CV
-from app.db.models.cv_embedding import CVEmbedding
-from app.repositories.hybrid_search import HybridSearchRepository
-from app.services.embedding_service import EmbeddingService
+"""Tools for CV Chat agent - RAG retrieval using LangChain tool pattern."""
+from typing import List, Annotated
+from langchain_core.tools import tool
+from app.services.vector_store_service import get_vector_store_service
 from app.core.logging import rag_logger
 
 
-async def search_candidates_by_query(
-    db: AsyncSession,
-    query_text: str,
-    top_k: int = 10,
-    similarity_threshold: float = 0.3
-) -> List[Dict[str, Any]]:
+@tool
+async def search_candidates(
+    query: Annotated[str, "Natural language search query to find candidates"],
+    top_k: Annotated[int, "Maximum number of results to return"] = 10,
+) -> str:
     """
-    Search candidates using natural language query via RAG.
+    Search for candidates using semantic search over their CVs.
+    
+    This tool performs vector similarity search to find candidates whose CVs
+    best match the natural language query. Use this when the user asks to:
+    - Find candidates with specific skills (e.g. "Java developers", "Python engineers")
+    - Search for candidates matching a job description  
+    - Look for candidates with certain experience or background
+    - Discover candidates in a particular domain or technology
     
     Args:
-        db: Database session
-        query_text: Natural language search query
-        top_k: Maximum number of results
-        similarity_threshold: Minimum similarity score (0-1)
+        query: Natural language description of what you're looking for
+        top_k: Maximum number of candidates to return (default: 10)
         
     Returns:
-        List of candidate dictionaries with similarity scores
+        JSON-formatted string containing candidate information with similarity scores
     """
     try:
-        # Generate embedding for the query
-        embedding_service = EmbeddingService()
-        query_embedding = await embedding_service.generate_embedding(query_text)
+        rag_logger.info(f"RAG Tool: Searching candidates with query='{query}', top_k={top_k}")
         
-        # Use hybrid search repository for RAG search
-        search_repo = HybridSearchRepository(db)
-        results = await search_repo.search_candidates(
-            query_embedding=query_embedding,
-            top_k=top_k,
-            similarity_threshold=similarity_threshold
+        # Get vector store service (uses LangChain's PGVector)
+        vector_store_service = get_vector_store_service()
+        
+        # Perform similarity search with scores
+        results = await vector_store_service.similarity_search_with_score(
+            query=query,
+            k=top_k
         )
         
-        # Format results for chat agent
-        formatted_results = []
-        for result in results:
-            candidate = result["candidate"]
-            cv = result["cv"]
-            cv_metadata = cv.structured_metadata or {}
-            
-            formatted_results.append({
-                "candidate_id": candidate.id,
-                "candidate_name": candidate.name,
-                "candidate_email": candidate.email,
-                "cv_id": result["cv_id"],
-                "similarity_score": result["similarity_score"],
-                "skills": cv_metadata.get("skills", []),
-                "experience_years": cv_metadata.get("experience_years"),
-                "education": cv_metadata.get("education", []),
-                "job_titles": cv_metadata.get("job_titles", []),
-                "companies": cv_metadata.get("companies", []),
-                "location": cv_metadata.get("location"),
-                "summary": cv_metadata.get("summary", ""),
-                "cv_text_preview": result["cv_text"][:500] if result["cv_text"] else ""
-            })
+        if not results:
+            rag_logger.info("No candidates found matching the query")
+            return "No candidates found matching your search criteria. Try using different keywords or less specific requirements."
         
-        rag_logger.info(f"Found {len(formatted_results)} candidates for query: {query_text[:100]}")
-        return formatted_results
+        # Format results for LLM
+        # Each Document has page_content (CV text) and metadata (candidate info)
+        candidates_info = []
+        for doc, score in results:
+            metadata = doc.metadata
+            
+            candidate_info = {
+                "candidate_id": metadata.get("candidate_id"),
+                "name": metadata.get("candidate_name"),
+                "email": metadata.get("candidate_email"),
+                "similarity_score": round(float(score), 3),
+                "skills": metadata.get("skills", []),
+                "experience_years": metadata.get("experience_years"),
+                "education": metadata.get("education", []),
+                "job_titles": metadata.get("job_titles", []),
+                "companies": metadata.get("companies", []),
+                "location": metadata.get("location"),
+                "summary": metadata.get("summary", "")[:300],  # Limit summary length
+                "cv_snippet": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+            }
+            candidates_info.append(candidate_info)
+        
+        rag_logger.info(f"RAG Tool: Found {len(candidates_info)} candidates")
+        
+        # Return formatted results as string for LLM
+        import json
+        return json.dumps({
+            "total_found": len(candidates_info),
+            "candidates": candidates_info,
+            "message": f"Found {len(candidates_info)} candidate(s) matching your criteria"
+        }, indent=2)
         
     except Exception as e:
-        rag_logger.error(f"Error searching candidates by query: {str(e)}")
-        raise
+        rag_logger.error(f"Error in search_candidates tool: {str(e)}", exc_info=True)
+        return f"Error searching candidates: {str(e)}"
 
 
-async def get_candidate_details(
-    db: AsyncSession,
-    candidate_id: int
-) -> Dict[str, Any] | None:
+# Helper function to create tool list for agent
+def get_cv_chat_tools() -> List:
     """
-    Get detailed information about a specific candidate.
+    Get list of tools for CV chat agent.
     
-    Args:
-        db: Database session
-        candidate_id: ID of the candidate
-        
     Returns:
-        Detailed candidate information or None if not found
+        List of LangChain tool instances
     """
-    try:
-        query = (
-            select(Candidate, CV)
-            .join(CV, Candidate.id == CV.candidate_id)
-            .where(Candidate.id == candidate_id)
-        )
-        
-        result = await db.execute(query)
-        row = result.first()
-        
-        if not row:
-            return None
-        
-        candidate, cv = row
-        cv_metadata = cv.structured_metadata or {}
-        
-        return {
-            "candidate_id": candidate.id,
-            "candidate_name": candidate.name,
-            "candidate_email": candidate.email,
-            "candidate_phone": candidate.phone,
-            "candidate_status": candidate.status.value if candidate.status else None,
-            "cv_id": cv.id,
-            "skills": cv_metadata.get("skills", []),
-            "experience_years": cv_metadata.get("experience_years"),
-            "education": cv_metadata.get("education", []),
-            "job_titles": cv_metadata.get("job_titles", []),
-            "companies": cv_metadata.get("companies", []),
-            "location": cv_metadata.get("location"),
-            "summary": cv_metadata.get("summary", ""),
-            "languages": cv_metadata.get("languages", []),
-            "certifications": cv_metadata.get("certifications", []),
-            "cv_full_text": cv.original_text,
-            "created_at": candidate.created_at.isoformat() if candidate.created_at else None,
-        }
-        
-    except Exception as e:
-        rag_logger.error(f"Error getting candidate details for ID {candidate_id}: {str(e)}")
-        raise
-
-
-async def compare_candidates(
-    db: AsyncSession,
-    candidate_ids: List[int]
-) -> List[Dict[str, Any]]:
-    """
-    Retrieve multiple candidates for comparison.
-    
-    Args:
-        db: Database session
-        candidate_ids: List of candidate IDs to compare
-        
-    Returns:
-        List of candidate details for comparison
-    """
-    try:
-        candidates = []
-        for candidate_id in candidate_ids:
-            details = await get_candidate_details(db, candidate_id)
-            if details:
-                candidates.append(details)
-        
-        rag_logger.info(f"Retrieved {len(candidates)} candidates for comparison")
-        return candidates
-        
-    except Exception as e:
-        rag_logger.error(f"Error comparing candidates: {str(e)}")
-        raise
-
-
-async def filter_candidates_by_criteria(
-    db: AsyncSession,
-    base_candidate_ids: List[int],
-    criteria: Dict[str, Any]
-) -> List[Dict[str, Any]]:
-    """
-    Filter a list of candidates by specific criteria.
-    
-    Args:
-        db: Database session
-        base_candidate_ids: Starting set of candidate IDs
-        criteria: Dictionary of filter criteria (skills, experience_years, location, etc.)
-        
-    Returns:
-        Filtered list of candidates
-    """
-    try:
-        # Build dynamic filters based on criteria
-        query = (
-            select(Candidate, CV)
-            .join(CV, Candidate.id == CV.candidate_id)
-            .where(Candidate.id.in_(base_candidate_ids))
-        )
-        
-        result = await db.execute(query)
-        rows = result.all()
-        
-        # Apply metadata-based filtering
-        filtered_results = []
-        for candidate, cv in rows:
-            cv_metadata = cv.structured_metadata or {}
-            
-            # Check each criterion
-            matches = True
-            
-            # Skills filter (case-insensitive, partial match)
-            if "skills" in criteria and criteria["skills"]:
-                required_skills = [s.lower() for s in criteria["skills"]]
-                candidate_skills = [s.lower() for s in cv_metadata.get("skills", [])]
-                if not any(skill in candidate_skills for skill in required_skills):
-                    matches = False
-            
-            # Experience years filter (minimum)
-            if "min_experience_years" in criteria:
-                exp_years = cv_metadata.get("experience_years")
-                if exp_years is None or exp_years < criteria["min_experience_years"]:
-                    matches = False
-            
-            # Location filter (case-insensitive, partial match)
-            if "location" in criteria and criteria["location"]:
-                candidate_location = (cv_metadata.get("location") or "").lower()
-                required_location = criteria["location"].lower()
-                if required_location not in candidate_location:
-                    matches = False
-            
-            # Companies filter (worked at any of these companies)
-            if "companies" in criteria and criteria["companies"]:
-                required_companies = [c.lower() for c in criteria["companies"]]
-                candidate_companies = [c.lower() for c in cv_metadata.get("companies", [])]
-                if not any(company in candidate_companies for company in required_companies):
-                    matches = False
-            
-            if matches:
-                filtered_results.append({
-                    "candidate_id": candidate.id,
-                    "candidate_name": candidate.name,
-                    "candidate_email": candidate.email,
-                    "cv_id": cv.id,
-                    "skills": cv_metadata.get("skills", []),
-                    "experience_years": cv_metadata.get("experience_years"),
-                    "location": cv_metadata.get("location"),
-                    "companies": cv_metadata.get("companies", []),
-                    "job_titles": cv_metadata.get("job_titles", []),
-                })
-        
-        rag_logger.info(f"Filtered {len(filtered_results)} candidates from {len(base_candidate_ids)} based on criteria")
-        return filtered_results
-        
-    except Exception as e:
-        rag_logger.error(f"Error filtering candidates: {str(e)}")
-        raise
+    return [
+        search_candidates,
+    ]

@@ -92,7 +92,7 @@ async def extract_metadata_node(state: CVParserState) -> dict:
 
 
 async def create_embeddings_node(state: CVParserState, db: AsyncSession) -> dict:
-    """Create embeddings for CV text and store in database."""
+    """Create embeddings for CV text and store in database + LangChain vector store."""
     llm_logger.info("Creating embeddings for CV")
     
     if not state.get("translated_text"):
@@ -102,6 +102,9 @@ async def create_embeddings_node(state: CVParserState, db: AsyncSession) -> dict
         }
     
     try:
+        from langchain_core.documents import Document
+        from app.services.vector_store_service import get_vector_store_service
+        
         embedding_service = EmbeddingService()
         
         # First, create CV record in database
@@ -123,11 +126,18 @@ async def create_embeddings_node(state: CVParserState, db: AsyncSession) -> dict
         await db.flush()
         await db.refresh(cv)
         
+        # Get candidate info for metadata
+        from app.db.models.candidate import Candidate
+        from sqlalchemy import select
+        candidate_query = select(Candidate).where(Candidate.id == state["candidate_id"])
+        candidate_result = await db.execute(candidate_query)
+        candidate = candidate_result.scalar_one_or_none()
+        
         # Chunk and embed the translated text
         chunks = embedding_service.chunk_text(state["translated_text"], chunk_size=500, overlap=50)
         embeddings = await embedding_service.generate_embeddings(chunks)
         
-        # Store embeddings
+        # Store embeddings in OLD schema (cv_embeddings table) for backward compatibility
         for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             cv_embedding = CVEmbedding(
                 cv_id=cv.id,
@@ -138,13 +148,44 @@ async def create_embeddings_node(state: CVParserState, db: AsyncSession) -> dict
             )
             db.add(cv_embedding)
         
+        # Also store in LangChain PGVector (NEW schema) for agentic RAG
+        llm_logger.info(f"Storing {len(chunks)} chunks in LangChain vector store")
+        
+        # Create metadata for LangChain documents
+        metadata = state.get("structured_metadata", {})
+        metadata.update({
+            "candidate_id": state["candidate_id"],
+            "candidate_name": candidate.name if candidate else "Unknown",
+            "candidate_email": candidate.email if candidate else "Unknown",
+            "cv_id": cv.id,
+            "original_language": state.get("original_language"),
+        })
+        
+        # Create LangChain Document objects
+        documents = [
+            Document(
+                page_content=chunk,
+                metadata={
+                    **metadata,
+                    "chunk_index": idx,
+                    "custom_id": f"cv_{cv.id}_chunk_{idx}"
+                }
+            )
+            for idx, chunk in enumerate(chunks)
+        ]
+        
+        # Add to LangChain vector store
+        vector_store_service = get_vector_store_service()
+        doc_ids = [f"cv_{cv.id}_chunk_{idx}" for idx in range(len(chunks))]
+        await vector_store_service.add_documents(documents, ids=doc_ids)
+        
         # Mark CV as processed
         cv.is_processed = True
         
         # Commit is handled by the caller (cv_processor service)
         # Don't commit here to allow caller to handle transaction
         
-        llm_logger.info(f"Created {len(chunks)} embeddings for CV {cv.id}")
+        llm_logger.info(f"Created {len(chunks)} embeddings for CV {cv.id} in both schemas")
         
         return {
             "cv_id": cv.id,

@@ -48,7 +48,6 @@ class ChatOrchestrator:
             workflow_result = await run_cv_chat_workflow(
                 user_query=request.query,
                 thread_id=thread_id,
-                user_identifier=request.user_identifier,
                 db=self.db
             )
             
@@ -58,7 +57,7 @@ class ChatOrchestrator:
                 thread_id=thread_id,
                 response_text=workflow_result["response_text"],
                 structured_response=workflow_result.get("structured_response", {}),
-                candidate_ids=workflow_result["candidate_ids"],
+                candidate_ids=[],
                 error=workflow_result.get("error")
             )
             

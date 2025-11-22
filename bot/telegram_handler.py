@@ -46,7 +46,8 @@ async def chat_with_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Send the response text back to Telegram
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=result.response_text
+        text=result.response_text,
+        parse_mode="Markdown"
     )
 
 
@@ -57,7 +58,7 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Show bot is recording/processing audio
     try:
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="record_audio")
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     except Exception:
         logger.debug("Failed to send record_audio action", exc_info=True)
 
@@ -120,7 +121,8 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # Send both the transcription and AI response
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=result.response_text
+        text=result.response_text,
+        parse_mode="Markdown"
     )
 
 def main() -> None:

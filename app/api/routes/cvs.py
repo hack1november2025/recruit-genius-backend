@@ -9,7 +9,8 @@ from app.api.dependencies import get_db
 from app.services.cv_processor import CVProcessorService
 from app.services.cv_parser import CVParserService
 from app.db.models.candidate import Candidate, CandidateStatus
-from app.schemas.cv import CVUploadResponse
+from app.schemas.cv import CVUploadResponse, CVResponse
+from app.repositories.cv import CVRepository
 from app.core.logging import api_logger
 
 router = APIRouter(prefix="/cvs", tags=["cvs"])
@@ -155,3 +156,43 @@ async def upload_cv(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"CV processing failed: {str(e)}"
         )
+
+
+@router.get("/candidate/{candidate_id}", response_model=list[CVResponse])
+async def get_candidate_cvs(
+    candidate_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all CVs for a specific candidate.
+    
+    Returns a list of all CVs associated with the candidate,
+    ordered by creation date (most recent first).
+    
+    Args:
+        candidate_id: ID of the candidate
+        db: Database session
+        
+    Returns:
+        List of CVs with all metadata
+    """
+    api_logger.info(f"Fetching CVs for candidate {candidate_id}")
+    
+    # Verify candidate exists
+    result = await db.execute(
+        select(Candidate).where(Candidate.id == candidate_id)
+    )
+    candidate = result.scalar_one_or_none()
+    
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate not found"
+        )
+    
+    # Get all CVs for the candidate
+    repo = CVRepository(db)
+    cvs = await repo.get_by_candidate(candidate_id)
+    
+    api_logger.info(f"Found {len(cvs)} CVs for candidate {candidate_id}")
+    return cvs

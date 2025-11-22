@@ -83,6 +83,23 @@ services:
       retries: 3
       start_period: 40s
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: recruitgenius-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@recruitgenius.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
+  pgadmin-data:

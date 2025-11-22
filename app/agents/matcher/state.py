@@ -13,7 +13,6 @@ class MatcherState(TypedDict):
     # Job information
     job_data: Dict[str, Any] | None
     job_text: str | None
-    job_embedding: List[float] | None
     job_metadata: Dict[str, Any] | None
     
     # Metadata filters (derived from job + overrides)

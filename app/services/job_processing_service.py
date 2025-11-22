@@ -86,14 +86,9 @@ class JobProcessingService:
                 for idx, chunk in enumerate(chunks)
             ]
             
-            # Store in LangChain vector store (runs in thread pool)
-            import asyncio
-            vector_store = self.vector_store_service.get_vector_store()
-            await asyncio.to_thread(
-                vector_store.add_documents,
-                documents,
-                ids=[f"job_{job_id}_chunk_{idx}" for idx in range(len(chunks))]
-            )
+            # Store in LangChain vector store
+            # Note: Don't specify IDs - let LangChain generate UUIDs automatically
+            await self.vector_store_service.add_documents(documents)
             
             await db.commit()
             

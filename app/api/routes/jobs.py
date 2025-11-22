@@ -175,7 +175,6 @@ async def batch_reprocess_jobs(
     - Initial setup when adding the processing feature
     - Bulk reprocessing after metadata schema changes
     """
-    from app.db.models.job_embedding import JobEmbedding
     from app.db.models.job_metadata import JobMetadata
     from sqlalchemy import select, func
     
@@ -195,19 +194,14 @@ async def batch_reprocess_jobs(
     
     for job in all_jobs:
         try:
-            # Check if already has embeddings
-            result = await db.execute(
-                select(func.count(JobEmbedding.id)).where(JobEmbedding.job_id == job.id)
-            )
-            embedding_count = result.scalar()
-            
+            # Check if already has metadata (embeddings are in LangChain now)
             result = await db.execute(
                 select(func.count(JobMetadata.id)).where(JobMetadata.job_id == job.id)
             )
             metadata_count = result.scalar()
             
             # Skip if already processed (unless you want to force reprocess)
-            if embedding_count > 0 and metadata_count > 0:
+            if metadata_count > 0:
                 results["skipped"] += 1
                 continue
             

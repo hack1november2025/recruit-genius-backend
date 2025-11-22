@@ -7,7 +7,6 @@ from app.services.translation_service import TranslationService
 from app.services.metadata_extraction_service import MetadataExtractionService
 from app.services.embedding_service import EmbeddingService
 from app.db.models.cv import CV
-from app.db.models.cv_embedding import CVEmbedding
 from app.core.logging import llm_logger
 
 
@@ -133,22 +132,10 @@ async def create_embeddings_node(state: CVParserState, db: AsyncSession) -> dict
         candidate_result = await db.execute(candidate_query)
         candidate = candidate_result.scalar_one_or_none()
         
-        # Chunk and embed the translated text
+        # Chunk the translated text for LangChain vector store
         chunks = embedding_service.chunk_text(state["translated_text"], chunk_size=500, overlap=50)
-        embeddings = await embedding_service.generate_embeddings(chunks)
         
-        # Store embeddings in OLD schema (cv_embeddings table) for backward compatibility
-        for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            cv_embedding = CVEmbedding(
-                cv_id=cv.id,
-                chunk_index=idx,
-                chunk_text=chunk,
-                embedding=embedding,
-                embedding_metadata={"source": "cv_parser_agent"}
-            )
-            db.add(cv_embedding)
-        
-        # Also store in LangChain PGVector (NEW schema) for agentic RAG
+        # Store in LangChain PGVector schema for agentic RAG
         llm_logger.info(f"Storing {len(chunks)} chunks in LangChain vector store")
         
         # Create metadata for LangChain documents
@@ -168,16 +155,18 @@ async def create_embeddings_node(state: CVParserState, db: AsyncSession) -> dict
                 metadata={
                     **metadata,
                     "chunk_index": idx,
-                    "custom_id": f"cv_{cv.id}_chunk_{idx}"
+                    "custom_id": f"cv_{cv.id}_chunk_{idx}",
+                    "entity_type": "cv",  # Mark as CV document for filtering
+                    "source": "cv_parser_agent"
                 }
             )
             for idx, chunk in enumerate(chunks)
         ]
         
         # Add to LangChain vector store
+        # Let LangChain generate UUIDs - custom IDs are stored in metadata
         vector_store_service = get_vector_store_service()
-        doc_ids = [f"cv_{cv.id}_chunk_{idx}" for idx in range(len(chunks))]
-        await vector_store_service.add_documents(documents, ids=doc_ids)
+        await vector_store_service.add_documents(documents)
         
         # Mark CV as processed
         cv.is_processed = True
@@ -185,7 +174,7 @@ async def create_embeddings_node(state: CVParserState, db: AsyncSession) -> dict
         # Commit is handled by the caller (cv_processor service)
         # Don't commit here to allow caller to handle transaction
         
-        llm_logger.info(f"Created {len(chunks)} embeddings for CV {cv.id} in both schemas")
+        llm_logger.info(f"Created {len(chunks)} embeddings for CV {cv.id} in LangChain vector store")
         
         return {
             "cv_id": cv.id,

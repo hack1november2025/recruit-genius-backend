@@ -26,14 +26,15 @@ class VectorStoreService:
             openai_api_key=settings.openai_api_key
         )
         
-        # Use psycopg (sync driver) for PGVector
-        # PGVector's async operations work with psycopg via asyncpg adapter
+        # Use plain postgresql:// connection string for langchain-postgres
+        # Remove SQLAlchemy dialect prefix (postgresql+asyncpg://)
         self.connection_string = settings.database_url.replace(
             "postgresql+asyncpg://",
-            "postgresql+psycopg://"
+            "postgresql://"
         )
         
-        # Collection name for CV embeddings
+        # Collection name for all documents (CVs and jobs)
+        # Note: Keep name as cv_documents for backward compatibility
         self.collection_name = "cv_documents"
         
         rag_logger.info("VectorStoreService initialized with LangChain PGVector")
@@ -170,28 +171,30 @@ class VectorStoreService:
         rag_logger.debug(f"Created retriever with kwargs: {search_kwargs}")
         return retriever
     
-    def add_documents(
+    async def add_documents(
         self,
-        documents: List[Document],
-        ids: List[str] = None
+        documents: List[Document]
     ) -> List[str]:
         """
-        Add documents to the vector store (synchronous operation).
+        Add documents to the vector store (async wrapper for sync operation).
+        LangChain will automatically generate UUIDs for document IDs.
+        Custom IDs should be stored in document metadata.
         
         Args:
             documents: List of Document objects to add
-            ids: Optional list of IDs for the documents
             
         Returns:
-            List of document IDs
+            List of generated document IDs (UUIDs)
         """
         try:
             vector_store = self.get_vector_store()
             
-            # add_documents is synchronous in PGVector
-            document_ids = vector_store.add_documents(
-                documents=documents,
-                ids=ids
+            # add_documents is synchronous in PGVector - run in thread pool
+            # Don't pass ids parameter - let LangChain generate UUIDs
+            import asyncio
+            document_ids = await asyncio.to_thread(
+                vector_store.add_documents,
+                documents
             )
             
             rag_logger.info(f"Added {len(documents)} documents to vector store")

@@ -41,18 +41,36 @@ async def retrieve_job_node(state: MatcherState, db: AsyncSession) -> Dict[str, 
                 "error": f"Job with id {job_id} not found"
             }
         
-        # Fetch job embeddings (average of all chunks)
-        embedding_query = select(JobEmbedding).where(JobEmbedding.job_id == job_id)
-        embedding_result = await db.execute(embedding_query)
-        embeddings = embedding_result.scalars().all()
+        # Check if job has embeddings in LangChain vector store
+        from app.services.vector_store_service import get_vector_store_service
+        vector_service = get_vector_store_service()
         
-        if not embeddings:
-            return {
-                "error": f"No embeddings found for job {job_id}. Please process the job first."
-            }
-        
-        # Average embeddings across chunks
-        avg_embedding = _average_embeddings([e.embedding for e in embeddings])
+        try:
+            # Search for any documents with this job_id
+            # Try without filter first to see if any embeddings exist
+            test_results = await vector_service.similarity_search(
+                query=job.title or "test",
+                k=1
+            )
+            
+            rag_logger.info(f"Vector store check: found {len(test_results)} total documents")
+            
+            # Now try with filter
+            filtered_results = await vector_service.similarity_search(
+                query=job.title or "test",
+                k=1,
+                filter_dict={"job_id": job.id, "entity_type": "job"}
+            )
+            
+            rag_logger.info(f"Filtered search for job {job.id}: found {len(filtered_results)} documents")
+            
+            if not filtered_results:
+                return {
+                    "error": f"Job {job_id} has not been processed. Please process the job first."
+                }
+        except Exception as e:
+            rag_logger.warning(f"Could not verify job embeddings: {str(e)}")
+            # Continue anyway - might be a temporary issue
         
         # Extract metadata
         job_metadata = {}
@@ -83,7 +101,6 @@ async def retrieve_job_node(state: MatcherState, db: AsyncSession) -> Dict[str, 
                 "location": job.location,
             },
             "job_text": job.description,
-            "job_embedding": avg_embedding,
             "job_metadata": job_metadata,
             "error": None,
         }
@@ -100,7 +117,7 @@ async def retrieve_job_node(state: MatcherState, db: AsyncSession) -> Dict[str, 
 
 async def rag_search_node(state: MatcherState, db: AsyncSession) -> Dict[str, Any]:
     """
-    Perform RAG-only vector similarity search (no metadata filters).
+    Perform RAG-only vector similarity search using LangChain vector store.
     Casts a wide net to find semantically similar candidates.
     
     Args:
@@ -113,20 +130,20 @@ async def rag_search_node(state: MatcherState, db: AsyncSession) -> Dict[str, An
     if state.get("error"):
         return {}
     
-    job_embedding = state.get("job_embedding")
+    job_text = state.get("job_text")
     top_k = state.get("top_k", 50)  # Wide net - get more candidates
     
-    if not job_embedding:
+    if not job_text:
         return {
-            "error": "Job embedding not available"
+            "error": "Job text not available"
         }
     
     try:
         repo = HybridSearchRepository(db)
         
-        # Perform RAG-only search
+        # Perform RAG-only search using LangChain vector store
         candidates = await repo.search_candidates(
-            query_embedding=job_embedding,
+            query_text=job_text,
             top_k=top_k,
             similarity_threshold=0.3  # Lower threshold to cast wider net
         )
@@ -362,22 +379,6 @@ def _build_rationale_from_metrics(
         parts.append(f"Note: AI extraction confidence at {confidence:.0f}%.")
     
     return " ".join(parts)
-
-
-def _average_embeddings(embeddings: List[List[float]]) -> List[float]:
-    """Average multiple embeddings into one."""
-    if not embeddings:
-        return []
-    
-    num_embeddings = len(embeddings)
-    dim = len(embeddings[0])
-    
-    avg = [0.0] * dim
-    for embedding in embeddings:
-        for i, val in enumerate(embedding):
-            avg[i] += val
-    
-    return [v / num_embeddings for v in avg]
 
 
 def _calculate_match_score(

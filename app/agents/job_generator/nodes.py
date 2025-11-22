@@ -176,9 +176,8 @@ async def call_tools(state: JobGeneratorState) -> dict:
         llm_logger.info(f"Calling tool: {tool_name} with args: {tool_args}")
         
         try:
-            # Execute the tool directly (not via .ainvoke) to maintain proper async context
+            # Execute the tool - it handles its own async context internally
             if tool_name == "save_job_to_database":
-                # Call the underlying coroutine function directly with kwargs
                 result = await save_job_to_database.coroutine(**tool_args)
             else:
                 result = f"Unknown tool: {tool_name}"
@@ -194,7 +193,7 @@ async def call_tools(state: JobGeneratorState) -> dict:
             tool_messages.append(tool_message)
             
         except Exception as e:
-            llm_logger.error(f"Tool execution failed: {str(e)}")
+            llm_logger.error(f"Tool execution failed: {str(e)}", exc_info=True)
             
             # Create error message
             tool_message = ToolMessage(

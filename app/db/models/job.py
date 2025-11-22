@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Text, JSON, Enum as SQLEnum
+from sqlalchemy.orm import relationship
 from app.db.base import Base, TimestampMixin
 import enum
 
@@ -27,3 +28,6 @@ class Job(Base, TimestampMixin):
         index=True
     )
     additional_metadata = Column(JSON, nullable=True)  # Store generation metadata, skills, etc.
+    
+    # Relationships
+    job_metadata = relationship("JobMetadata", uselist=False, back_populates="job", lazy="select")

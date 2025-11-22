@@ -1,5 +1,6 @@
 """Job Metadata model for structured job requirements."""
 from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime, Float, UniqueConstraint
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base
 
@@ -49,6 +50,9 @@ class JobMetadata(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    job = relationship("Job", back_populates="job_metadata")
     
     __table_args__ = (
         UniqueConstraint('job_id', name='unique_job_metadata'),

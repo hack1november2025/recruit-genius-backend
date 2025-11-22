@@ -7,6 +7,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 from app.core.config import get_settings
 from app.core.logging import llm_logger
+from app.core.langfuse_config import get_langfuse_callbacks
 
 
 class WorkExperience(BaseModel):
@@ -102,6 +103,7 @@ class MetadataExtractionService:
         Returns:
             Dictionary with extracted metadata
         """
+        settings = get_settings()
         llm_logger.info("Extracting metadata from CV")
         
         system_prompt = f"""You are an expert CV/résumé parser. Extract structured information from the CV text.
@@ -122,7 +124,17 @@ For career progression, assess whether the candidate has moved to more senior ro
         ]
         
         try:
-            response = await self.llm.ainvoke(messages)
+            # Get Langfuse callbacks for LLM tracking
+            callbacks = get_langfuse_callbacks(
+                trace_name="cv_metadata_extraction",
+                tags=["metadata_extraction", "cv_parser", "structured_output"],
+                metadata={
+                    "text_length": len(cv_text),
+                    "model": settings.llm_model
+                }
+            )
+            
+            response = await self.llm.ainvoke(messages, config={"callbacks": callbacks})
             
             # Parse JSON response
             try:

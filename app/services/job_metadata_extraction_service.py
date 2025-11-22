@@ -7,6 +7,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 from app.core.config import get_settings
 from app.core.logging import llm_logger
+from app.core.langfuse_config import get_langfuse_callbacks
 
 
 class JobMetadataStructure(BaseModel):
@@ -87,7 +88,16 @@ For seniority, infer from title and requirements: "junior", "mid", "senior", "le
         ]
         
         try:
-            response = await self.llm.ainvoke(messages)
+            # Get Langfuse callbacks for LLM tracking
+            callbacks = get_langfuse_callbacks(
+                trace_name="job_metadata_extraction",
+                tags=["metadata_extraction", "job_processing", "structured_output"],
+                metadata={
+                    "description_length": len(job_description)
+                }
+            )
+            
+            response = await self.llm.ainvoke(messages, config={"callbacks": callbacks})
             
             # Parse JSON response
             try:

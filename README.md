@@ -166,6 +166,7 @@ Conversational interface to query your CV database using natural language.
 - **LangGraph 0.2.45** - Stateful AI agent workflows with checkpointing
 - **OpenAI GPT-4o** - Advanced language model for generation and analysis
 - **OpenAI text-embedding-3-small** - Efficient text embeddings
+- **Langfuse** - LLM observability and analytics for tracking all AI operations
 - **tiktoken** - Token counting and text chunking
 
 ### Database & Storage
@@ -852,6 +853,7 @@ This project is licensed under the MIT License.
 
 - **Documentation**: [docs/](docs/)
 - **API Docs**: http://localhost:8000/docs
+- **Langfuse Integration**: [LANGFUSE_INTEGRATION_SUMMARY.md](LANGFUSE_INTEGRATION_SUMMARY.md)
 - **Email**: valerio.silva@klx.pt
 
 ---

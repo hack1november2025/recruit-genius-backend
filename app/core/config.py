@@ -26,10 +26,17 @@ class Settings(BaseSettings):
     langchain_tracing_v2: bool = False
     langchain_api_key: str | None = None
     langchain_project: str | None = None
+    
+    # Langfuse
+    langfuse_enabled: bool = True
+    langfuse_public_key: str = "pk-lf-78506f8d-de33-4560-8678-ca83a92f21d2"
+    langfuse_secret_key: str = "sk-lf-1dea372d-3dd5-44d1-a43f-df3edc44fc4a"
+    langfuse_host: str = "https://llminsights.abbaflow.com"
+    
     # Optional Redis URL (may be provided in environment)
     redis_url: str | None = None
     # Telegram
-    telegram_bot_token: str | None
+    telegram_bot_token: str | None = None
     
     # Server
     host: str = "0.0.0.0"

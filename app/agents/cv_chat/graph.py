@@ -8,6 +8,7 @@ from app.agents.cv_chat.state import CVChatState
 from app.agents.cv_chat.tools import get_cv_chat_tools
 from app.core.config import get_settings
 from app.core.logging import rag_logger
+from app.core.langfuse_config import get_langfuse_callbacks
 import psycopg
 
 
@@ -139,6 +140,18 @@ async def run_cv_chat_workflow(
                 "thread_id": thread_id
             }
         }
+        
+        # Add Langfuse callbacks for LLM observability
+        callbacks = get_langfuse_callbacks(
+            session_id=thread_id,
+            trace_name="cv_chat_agent",
+            tags=["cv_chat", "rag", "agent"],
+            metadata={"query": user_query[:100]}
+        )
+        
+        # Merge callbacks into config
+        if callbacks:
+            config["callbacks"] = callbacks
         
         # Prepare messages for the agent
         from langchain_core.messages import HumanMessage

@@ -3,6 +3,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.core.config import get_settings
 from app.core.logging import llm_logger
+from app.core.langfuse_config import get_langfuse_callbacks
 from langdetect import detect, LangDetectException
 
 
@@ -77,7 +78,17 @@ Provide ONLY the translated text, without any additional commentary."""
         ]
         
         try:
-            response = await self.llm.ainvoke(messages)
+            # Get Langfuse callbacks for LLM tracking
+            callbacks = get_langfuse_callbacks(
+                trace_name="cv_translation",
+                tags=["translation", "cv_parser"],
+                metadata={
+                    "source_language": source_lang,
+                    "text_length": len(text)
+                }
+            )
+            
+            response = await self.llm.ainvoke(messages, config={"callbacks": callbacks})
             translated_text = response.content
             
             llm_logger.info(f"Successfully translated CV ({len(text)} -> {len(translated_text)} chars)")

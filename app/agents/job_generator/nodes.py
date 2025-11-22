@@ -5,6 +5,7 @@ from app.agents.job_generator.state import JobGeneratorState
 from app.agents.job_generator.tools import save_job_to_database
 from app.core.config import get_settings
 from app.core.logging import llm_logger
+from app.core.langfuse_config import get_langfuse_callbacks
 
 
 settings = get_settings()
@@ -99,7 +100,16 @@ Conversation to summarize:
 Provide a concise summary (2-3 sentences):"""
     
     # Get summary from LLM
-    summary_response = await summarization_llm.ainvoke([HumanMessage(content=summary_prompt)])
+    callbacks = get_langfuse_callbacks(
+        session_id=state.get("session_id"),
+        trace_name="job_generator_summarization",
+        tags=["job_generator", "summarization"],
+        metadata={"message_count": len(messages_to_summarize)}
+    )
+    summary_response = await summarization_llm.ainvoke(
+        [HumanMessage(content=summary_prompt)],
+        config={"callbacks": callbacks}
+    )
     summary_text = summary_response.content
     
     llm_logger.info(f"Created summary: {summary_text[:100]}...")
@@ -137,8 +147,16 @@ async def call_model(state: JobGeneratorState) -> dict:
     if not messages or not isinstance(messages[0], SystemMessage):
         messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
     
-    # Call LLM with tools
-    response = await llm_with_tools.ainvoke(messages)
+    # Get Langfuse callbacks with session context
+    callbacks = get_langfuse_callbacks(
+        session_id=state.get("session_id"),
+        trace_name="job_generator_agent",
+        tags=["job_generator", "agent", "generation"],
+        metadata={"message_count": len(messages)}
+    )
+    
+    # Call LLM with tools and Langfuse tracking
+    response = await llm_with_tools.ainvoke(messages, config={"callbacks": callbacks})
     
     llm_logger.info("Agent responded")
     

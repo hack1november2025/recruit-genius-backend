@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
+from app.core.langfuse_config import flush_langfuse
 from app.api.routes import health, candidates, jobs, matches, job_descriptions, cvs, matcher, chat
 
 settings = get_settings()
@@ -47,6 +48,8 @@ async def startup_event():
 async def shutdown_event():
     """Run on application shutdown."""
     print(f"👋 Shutting down {settings.app_name}")
+    # Flush Langfuse to ensure all traces are sent
+    flush_langfuse()
 
 
 if __name__ == "__main__":

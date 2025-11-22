@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # Optional Redis URL (may be provided in environment)
     redis_url: str | None = None
     # Telegram
-    telegram_bot_token: str | None = None
+    telegram_bot_token: str | None
     
     # Server
     host: str = "0.0.0.0"

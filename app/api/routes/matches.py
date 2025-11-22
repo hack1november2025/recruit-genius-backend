@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_db
 from app.repositories.match import MatchRepository
 from app.schemas.match import MatchCreate, MatchResponse
-from app.services.recruiter import RecruiterService
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
@@ -13,25 +12,14 @@ async def create_match(
     match: MatchCreate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a candidate-job match using AI analysis."""
-    service = RecruiterService(db)
+    """Create a candidate-job match.
     
-    try:
-        result = await service.match_candidate_to_job(
-            candidate_id=match.candidate_id,
-            job_id=match.job_id
-        )
-        return result
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Match creation failed: {str(e)}"
-        )
+    Note: This endpoint is deprecated. Use /api/v1/matcher/match instead for AI-powered matching.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="This endpoint is deprecated. Use /api/v1/matcher/match for AI-powered matching."
+    )
 
 
 @router.get("/candidate/{candidate_id}", response_model=list[MatchResponse])

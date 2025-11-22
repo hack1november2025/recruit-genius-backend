@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_db
 from app.repositories.candidate import CandidateRepository
 from app.schemas.candidate import CandidateCreate, CandidateUpdate, CandidateResponse
-from app.services.recruiter import RecruiterService
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 
@@ -85,33 +84,6 @@ async def update_candidate(
         )
     
     return updated_candidate
-
-
-@router.post("/{candidate_id}/analyze")
-async def analyze_candidate(
-    candidate_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """Analyze candidate resume using AI."""
-    service = RecruiterService(db)
-    
-    try:
-        analysis = await service.analyze_candidate_resume(candidate_id)
-        return {
-            "candidate_id": candidate_id,
-            "analysis": analysis,
-            "status": "completed"
-        }
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Analysis failed: {str(e)}"
-        )
 
 
 @router.delete("/{candidate_id}", status_code=status.HTTP_204_NO_CONTENT)

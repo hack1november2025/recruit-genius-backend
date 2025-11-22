@@ -1,59 +1,232 @@
-# HR AI Recruitment Manager - Backend
+<div align="center">
 
-AI-powered recruitment assistant built with FastAPI, LangGraph, and PostgreSQL.
+# 🚀 RecruitGenius AI
 
-## Features
+### Next-Generation AI-Powered Recruitment Platform
 
-- **🤖 Conversational Job Generator**: AI-powered job description creation with context maintenance
-- **📄 Resume Analysis**: Parse and analyze candidate resumes (PDF/DOCX)
-- **🎯 Job Matching**: Match candidates to job positions using AI with 8-metric evaluation
-- **💬 RAG Chat Interface**: Semantic search across CVs with pgvector
-- **📊 Analytics Dashboard**: Real-time recruitment metrics and insights
-- **🐳 Docker Ready**: One-command deployment with automated migrations
+**Transform Your Hiring Process with Intelligent Automation**
 
-## Tech Stack
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python)](https://www.python.org)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.2.45-FF6B6B?style=for-the-badge)](https://langchain-ai.github.io/langgraph/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791?style=for-the-badge&logo=postgresql)](https://www.postgresql.org)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)](https://www.docker.com)
 
-- **FastAPI**: Modern async web framework
-- **LangGraph 0.2.45**: AI agent orchestration with PostgreSQL checkpointing
-- **LangChain 0.3.7**: LLM integration and tools
-- **PostgreSQL + pgvector**: Database with vector similarity search
-- **Redis**: Caching layer for analytics
-- **OpenAI**: GPT-4o-mini for generation, text-embedding-3-small for embeddings
-- **Docker & Docker Compose**: Containerized deployment
+[**Features**](#-core-features) • [**Quick Start**](#-quick-start) • [**Architecture**](#-architecture) • [**Documentation**](#-documentation) • [**API**](#-api-reference)
 
-## Quick Start
+</div>
+
+---
+
+## 📖 Table of Contents
+
+- [Overview](#-overview)
+- [Core Features](#-core-features)
+- [Tech Stack](#-tech-stack)
+- [Quick Start](#-quick-start)
+- [Architecture](#-architecture)
+- [AI Agents](#-ai-agents)
+- [API Reference](#-api-reference)
+- [CV Processing Pipeline](#-cv-processing-pipeline)
+- [Job Matching System](#-job-matching-system)
+- [Development](#-development)
+- [Deployment](#-deployment)
+- [Documentation](#-documentation)
+- [Troubleshooting](#-troubleshooting)
+
+---
+
+## 🎯 Overview
+
+**RecruitGenius AI** is a cutting-edge, AI-powered recruitment management platform that revolutionizes the hiring process through intelligent automation. Built with enterprise-grade technologies and powered by advanced LLMs, it combines conversational AI, vector-based semantic search, and comprehensive candidate evaluation to deliver unparalleled recruitment efficiency.
+
+### Why RecruitGenius?
+
+- 🤖 **Conversational AI** - Natural language interactions for job creation and candidate search
+- 🎯 **Intelligent Matching** - Advanced 8-metric evaluation system for precise candidate-job alignment
+- 📊 **RAG-Powered Search** - Semantic search across your entire CV database using pgvector
+- 🌍 **Multi-Language Support** - Automatic translation of CVs in any language to English
+- 📈 **Real-Time Analytics** - Comprehensive dashboard with recruitment metrics and insights
+- 🔄 **Automated Workflow** - End-to-end automation from CV upload to candidate ranking
+- 🐳 **Production-Ready** - Fully containerized with Docker, health checks, and monitoring
+
+### Perfect For
+
+- **Recruitment Agencies** - Scale your operations with AI-powered candidate matching
+- **HR Departments** - Streamline hiring workflows and reduce time-to-hire
+- **Startups** - Build your team efficiently with limited HR resources
+- **Enterprise** - Handle high-volume recruitment with consistent quality
+
+---
+
+## ✨ Core Features
+
+### 1. 🤖 AI-Powered Job Description Generator
+
+Generate comprehensive, professional job postings from simple descriptions using conversational AI.
+
+**Features:**
+- 💬 Natural language interface - just describe what you need
+- 🔄 Iterative refinement - modify jobs through conversation
+- 🎨 Multiple tone options - formal, friendly, or inclusive
+- ✅ Bias detection and inclusive language suggestions
+- 💾 Direct database integration with save commands
+- 📝 Structured output with responsibilities, requirements, and benefits
+
+**Example:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/job-descriptions/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Create a job for a senior Python backend engineer with AWS experience"
+  }'
+```
+
+### 2. 📄 Intelligent CV Processing
+
+Advanced CV parsing with automatic language detection, translation, and metadata extraction.
+
+**Pipeline:**
+1. **Upload** - Support for PDF and DOCX formats
+2. **Text Extraction** - High-quality text extraction from documents
+3. **Language Detection** - Automatic detection of 50+ languages
+4. **Translation** - Automatic translation to English for consistency
+5. **Metadata Extraction** - LLM-powered extraction of skills, experience, education
+6. **Embedding Generation** - OpenAI text-embedding-3-small for semantic search
+7. **Storage** - Structured storage with vector embeddings
+
+**Features:**
+- 🌍 Multi-language support with automatic translation
+- 🔍 Smart candidate matching by email
+- 📊 Automatic chunking for large CVs
+- 🎯 Vector embeddings for semantic search
+- 📈 Quality scoring and validation
+
+### 3. 🎯 Advanced Job Matching System
+
+State-of-the-art RAG-first matching with comprehensive 8-metric evaluation.
+
+**8 Core Metrics:**
+
+| Metric | Weight | Description |
+|--------|--------|-------------|
+| **Skills Match** | 25% | Semantic + keyword matching of required skills |
+| **Experience Relevance** | 20% | Years of experience in relevant roles |
+| **Education Fit** | 15% | Degree level and field alignment |
+| **Achievement Impact** | 15% | Quantifiable accomplishments and outcomes |
+| **Keyword Density** | 10% | Relevant terminology presence |
+| **Employment Gap** | 5% | Career continuity assessment |
+| **Readability** | 5% | CV structure and clarity |
+| **AI Confidence** | 5% | Extraction reliability score |
+
+**Composite Score Formula:**
+```python
+composite = (
+    skills_match * 0.25 +
+    experience_relevance * 0.20 +
+    education_fit * 0.15 +
+    achievement_impact * 0.15 +
+    keyword_density * 0.10 +
+    employment_gap * 0.05 +
+    readability * 0.05 +
+    ai_confidence * 0.05
+) # Result: 0-100
+```
+
+### 4. 💬 RAG-Powered CV Chat Interface
+
+Conversational interface to query your CV database using natural language.
+
+**Capabilities:**
+- 🔍 Semantic search across all CVs
+- 💬 Natural language queries (e.g., "Find Java developers in London")
+- 🧠 Context-aware conversations with memory
+- 📊 Structured candidate summaries
+- 🔗 Direct candidate profile links
+- 💾 Persistent conversation history
+
+**Architecture:**
+- **LangGraph ReAct Agent** - Autonomous reasoning and tool use
+- **PostgreSQL Checkpointing** - Conversation state persistence
+- **Tool-Based RAG** - LLM decides when to retrieve information
+- **Vector Search** - pgvector for semantic similarity
+
+---
+
+## 🛠 Tech Stack
+
+### Core Framework
+- **FastAPI 0.115+** - High-performance async Python web framework
+- **Python 3.11+** - Modern Python with type hints and async/await
+- **Uvicorn** - Lightning-fast ASGI server
+- **Pydantic 2.9+** - Data validation and settings management
+
+### AI & Machine Learning
+- **LangChain 0.3.7** - LLM orchestration and chain building
+- **LangGraph 0.2.45** - Stateful AI agent workflows with checkpointing
+- **OpenAI GPT-4o** - Advanced language model for generation and analysis
+- **OpenAI text-embedding-3-small** - Efficient text embeddings
+- **tiktoken** - Token counting and text chunking
+
+### Database & Storage
+- **PostgreSQL 16** - Robust relational database
+- **pgvector** - Vector similarity search extension
+- **SQLAlchemy 2.0+** - Async ORM with advanced features
+- **Alembic 1.13+** - Database migration management
+- **asyncpg** - High-performance PostgreSQL driver
+
+### Document Processing
+- **pypdf 4.0+** - PDF text extraction
+- **python-docx 1.1+** - DOCX document parsing
+- **langdetect 1.0.9** - Language detection for 50+ languages
+- **python-magic** - File type detection
+
+### Development Tools
+- **Docker & Docker Compose** - Containerization and orchestration
+- **pytest** - Testing framework
+- **black** - Code formatting
+- **ruff** - Fast Python linter
+- **uv** - Modern Python package manager
+
+---
+
+## ⚡ Quick Start
 
 ### Prerequisites
 
-- Python 3.11+
-- Docker & Docker Compose
-- OpenAI API Key
+- **Docker & Docker Compose** (recommended)
+- **Python 3.11+** (for local development)
+- **OpenAI API Key**
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker Deployment (Recommended) 🐳
 
-The fastest way to get started is using Docker with the automated setup script:
+The fastest way to get RecruitGenius running:
 
 ```bash
-# 1. Copy environment file and add your OpenAI API key
-cp .env.example .env
-# Edit .env and set OPENAI_API_KEY=your-key-here
+# 1. Clone the repository
+git clone <repository-url>
+cd backend
 
-# 2. Run the automated Docker setup script
-./docker-start.sh
+# 2. Create .env file with your OpenAI API key
+cp .env.example .env
+# Edit .env and set OPENAI_API_KEY=sk-your-key-here
+
+# 3. Start everything with one command
+docker compose up -d
+
+# 4. Wait for health checks (~30 seconds)
+docker compose logs -f app
+
+# ✅ Ready when you see: "Application startup complete"
 ```
 
-That's it! The script will:
-- Build the Docker image with all dependencies
-- Start PostgreSQL (with pgvector), Redis, and the application
-- Automatically run all database migrations
-- Verify the application is healthy
-
 **Access the application:**
-- API: http://localhost:8000
-- Swagger Docs: http://localhost:8000/docs
-- Health Check: http://localhost:8000/api/v1/health
+- 🌐 **API**: http://localhost:8000
+- 📚 **Documentation**: http://localhost:8000/docs
+- ✅ **Health Check**: http://localhost:8000/api/v1/health
+- 🗄️ **pgAdmin**: http://localhost:5050 (admin@recruitgenius.com / admin)
 
-**Docker commands:**
+**Useful Docker commands:**
 ```bash
 # View logs
 docker compose logs -f app
@@ -61,434 +234,634 @@ docker compose logs -f app
 # Stop services
 docker compose down
 
-# Restart
-docker compose restart app
-
 # Rebuild after code changes
 docker compose up -d --build
+
+# View container status
+docker compose ps
+
+# Access database shell
+docker compose exec db psql -U postgres -d recruitment
 ```
 
-See [README.Docker.md](README.Docker.md) for detailed Docker documentation.
+### Option 2: Local Development 💻
+
+For development with hot-reload:
+
+```bash
+# 1. Install uv package manager
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. Start database with Docker
+docker compose up -d db pgadmin
+
+# 3. Install Python dependencies
+uv sync
+
+# 4. Create .env file
+cp .env.example .env
+# Edit .env and configure:
+# - OPENAI_API_KEY=sk-your-key-here
+# - DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/recruitment
+
+# 5. Enable pgvector extension
+docker compose exec db psql -U postgres -d recruitment -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+# 6. Run database migrations
+uv run alembic upgrade head
+
+# 7. Start development server
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Verify installation:**
+```bash
+# Check migration status
+uv run alembic current
+
+# Test API
+curl http://localhost:8000/api/v1/health
+
+# Expected response:
+# {"status": "healthy", "database": "connected"}
+```
 
 ---
 
-### Option 2: Local Development (with uv)
+## 🏗 Architecture
 
-For local development with hot-reload:
+RecruitGenius follows a clean, layered architecture optimized for AI agent workflows:
 
-**Prerequisites:**
-- uv (Python package manager)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         FastAPI Application                      │
+└─────────────────────────────────────────────────────────────────┘
+                                 │
+        ┌────────────────────────┼────────────────────────┐
+        │                        │                        │
+        ▼                        ▼                        ▼
+┌──────────────┐        ┌──────────────┐        ┌──────────────┐
+│  API Routes  │        │  AI Agents   │        │   Services   │
+│              │        │              │        │              │
+│ • Health     │◄───────│ • CV Parser  │───────►│ • CV Proc.   │
+│ • CVs        │        │ • Job Gen    │        │ • Embedding  │
+│ • Jobs       │        │ • Matcher    │        │ • Translation│
+│ • Matcher    │        │ • CV Chat    │        │ • Metrics    │
+│ • Chat       │        │              │        │ • RAG        │
+└──────────────┘        └──────────────┘        └──────────────┘
+        │                        │                        │
+        └────────────────────────┼────────────────────────┘
+                                 ▼
+                        ┌──────────────┐
+                        │ Repositories │
+                        │              │
+                        │ • Base CRUD  │
+                        │ • Candidate  │
+                        │ • CV         │
+                        │ • Job        │
+                        │ • Match      │
+                        │ • Vector Ops │
+                        └──────────────┘
+                                 │
+        ┌────────────────────────┼────────────────────────┐
+        ▼                        ▼                        ▼
+┌──────────────┐        ┌──────────────┐        ┌──────────────┐
+│ PostgreSQL   │        │   pgvector   │        │  OpenAI API  │
+│              │        │              │        │              │
+│ • Structured │        │ • Embeddings │        │ • GPT-4o     │
+│   Data       │        │ • Semantic   │        │ • Embeddings │
+│ • Relations  │        │   Search     │        │ • Chat       │
+└──────────────┘        └──────────────┘        └──────────────┘
+```
 
-Install uv if you haven't:
+### Project Structure
+
+```
+backend/
+├── app/
+│   ├── agents/                    # 🤖 LangGraph AI Agents
+│   │   ├── cv_parser/            # CV processing workflow
+│   │   ├── job_generator/        # Conversational job creation
+│   │   ├── matcher/              # RAG-first candidate matching
+│   │   └── cv_chat/              # Conversational CV search
+│   ├── api/                       # 🌐 REST API Layer
+│   │   └── routes/               # API endpoints
+│   ├── services/                  # 💼 Business Logic
+│   ├── repositories/              # 🗄️ Data Access Layer
+│   ├── db/                        # 🗃️ Database Layer
+│   │   └── models/               # SQLAlchemy models
+│   ├── schemas/                   # 📋 Pydantic Schemas
+│   ├── core/                      # ⚙️ Core Configuration
+│   └── main.py                    # 🚀 Application entry point
+├── alembic/                       # 🔄 Database Migrations
+├── docs/                          # 📚 Documentation
+├── specifications/                # 📝 Requirements
+├── tests/                         # 🧪 Test Suite
+├── docker-compose.yml             # 🐳 Docker orchestration
+├── Dockerfile                     # 🐳 Container image
+├── pyproject.toml                 # 📦 Dependencies
+└── README.md                      # 📖 This file
+```
+
+---
+
+## 🤖 AI Agents
+
+RecruitGenius uses **LangGraph** to implement sophisticated AI agents with state management and workflow orchestration.
+
+### 1. CV Parser Agent
+
+**Purpose:** Process uploaded CVs through a multi-stage pipeline.
+
+**Workflow:**
+```
+START → Extract Text → Detect Language → Translate → 
+Extract Metadata → Generate Embeddings → END
+```
+
+**Key Features:**
+- Supports PDF and DOCX files
+- Automatic language detection (50+ languages)
+- Translation to English for consistency
+- LLM-powered metadata extraction
+- Vector embedding generation
+
+### 2. Job Generator Agent
+
+**Purpose:** Conversational job description creation with iterative refinement.
+
+**Pattern:** ReAct (Reasoning + Acting)
+
+**Features:**
+- 💬 Multi-turn conversations with context
+- 🧠 PostgreSQL checkpointing for persistence
+- 🔄 Iterative refinement
+- 💾 Direct save to database via tool calling
+
+### 3. Matcher Agent
+
+**Purpose:** RAG-first candidate matching with comprehensive evaluation.
+
+**Workflow:**
+```
+START → Retrieve Job → RAG Search → Calculate Metrics → 
+Score Candidates → END
+```
+
+**Features:**
+- 🎯 Vector similarity search first
+- 📊 Comprehensive 8-metric evaluation
+- 🔄 Configurable top_k results
+- 🚨 Error handling at each step
+
+### 4. CV Chat Agent
+
+**Purpose:** Conversational interface for CV database queries.
+
+**Pattern:** ReAct Agent with Tool Calling
+
+**Features:**
+- 🔍 Autonomous tool usage
+- 💾 PostgreSQL checkpointing for conversation memory
+- 🎯 Context-aware responses
+- 📊 Structured candidate summaries
+
+---
+
+## 📡 API Reference
+
+### Base URL
+```
+http://localhost:8000/api/v1
+```
+
+### Health & Status
+
+#### `GET /health`
+System health check.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "database": "connected",
+  "timestamp": "2025-11-22T10:30:00Z"
+}
+```
+
+---
+
+### CV Management
+
+#### `POST /cvs/upload`
+Upload and process a CV.
+
+**Request:**
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -X POST "http://localhost:8000/api/v1/cvs/upload" \
+  -F "file=@john_doe_cv.pdf"
 ```
 
-### Installation
+**Response:**
+```json
+{
+  "success": true,
+  "cv_id": 123,
+  "candidate_id": 45,
+  "original_language": "es",
+  "metadata": {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "skills": ["Python", "FastAPI", "PostgreSQL"],
+    "experience_years": 5
+  },
+  "embeddings_created": true
+}
+```
 
-1. **Clone and enter the directory:**
+---
+
+### Job Description Generation
+
+#### `POST /job-descriptions/chat`
+Conversational job description generation.
+
+**Request:**
 ```bash
-cd backend
-```
-
-2. **Start Docker services:**
-```bash
-cd local
-docker compose up -d
-cd ..
-```
-
-This starts PostgreSQL on `localhost:5432` and pgAdmin on `localhost:5050`.
-
-3. **Install Python dependencies:**
-```bash
-uv sync
-```
-
-4. **Set up environment:**
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and configure the following **required** settings:
-```env
-# REQUIRED: Add your OpenAI API key
-OPENAI_API_KEY=sk-proj-your-actual-key-here
-
-# Database connection (update if using different credentials)
-DATABASE_URL=postgresql+asyncpg://recruitgenius:recruitgenius_dev@localhost:5432/recruitgenius
-```
-
-5. **Create database and enable pgvector extension:**
-```bash
-# Create database in Docker container
-docker exec recruitgenius-postgres psql -U recruitgenius -c "CREATE DATABASE recruitgenius;"
-
-# Enable pgvector extension (required for embeddings)
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "CREATE EXTENSION IF NOT EXISTS vector;"
-```
-
-6. **Run database migrations:**
-
-**⚠️ IMPORTANT:** This project uses Alembic migrations. You **MUST** run all migrations to create the required database schema. The migrations create:
-- Base tables (candidates, jobs, matches, agent_executions)
-- CV processing tables (cvs, cv_embeddings, cv_metrics)
-- Job metadata tables (job_embeddings, job_metadata)
-- Chat session tables (chat_sessions, chat_messages)
-
-```bash
-# Apply all migrations to create database schema
-uv run alembic upgrade head
-```
-
-**Verify migrations were applied:**
-```bash
-# Check migration history
-uv run alembic current
-
-# Should show: effc88337b9a (head)
-```
-
-**If you see errors about missing tables or columns**, it means migrations weren't run. Always run `uv run alembic upgrade head` after pulling changes.
-
-7. **Start the server:**
-```bash
-uv run uvicorn app.main:app --reload
-```
-
-8. **Access the API:**
-- API Docs: http://localhost:8000/docs
-- Health Check: http://localhost:8000/api/v1/health
-- pgAdmin: http://localhost:5050 (admin@recruitgenius.com / admin)
-
-## Project Structure
-
-```
-app/
-├── agents/              # LangGraph agents
-│   └── recruiter/       # Main recruitment agent
-├── api/                 # API routes
-├── core/                # Configuration
-├── db/                  # Database models
-├── repositories/        # Data access layer
-├── schemas/             # Pydantic schemas
-├── services/            # Business logic
-└── main.py             # Entry point
-```
-
-## API Endpoints
-
-### Conversational Job Generator (NEW)
-- `POST /api/v1/job-descriptions/chat` - Chat with job generator agent
-  - Send simple text: `{"message": "Create job for senior Python developer"}`
-  - Returns markdown job description with thread_id
-  - Use thread_id to continue conversation: `?thread_id=job_abc123`
-  - Request modifications: `{"message": "Make it more friendly"}`
-  - Save to database: `{"message": "Save with title Senior Python Developer"}`
-- `POST /api/v1/job-descriptions/chat/stream` - Streaming version
-
-### Standard CRUD
-- `POST /api/v1/candidates` - Create candidate
-- `POST /api/v1/candidates/{id}/analyze` - Analyze resume
-- `POST /api/v1/jobs` - Create job posting
-- `POST /api/v1/matches` - Match candidates to jobs
-- `GET /api/v1/candidates` - List candidates
-- `GET /api/v1/jobs` - List jobs
-
-### Quick Test
-```bash
-# Test conversational job generator
-./test_chat_api.sh
-
-# Or manually
 curl -X POST "http://localhost:8000/api/v1/job-descriptions/chat" \
   -H "Content-Type: application/json" \
-  -d '{"message": "Create job for senior backend engineer with Python"}'
+  -d '{
+    "message": "Create a job for a senior backend engineer with Python and AWS"
+  }'
 ```
 
-## Development
-
-### Database Schema Version
-
-**Current Migration:** `effc88337b9a` (November 21, 2025)
-
-This migration includes:
-- ✅ CV processing with separate `cvs` table
-- ✅ CV embeddings (pgvector) linked to `cvs`
-- ✅ Job embeddings for semantic job matching
-- ✅ Job metadata extraction and storage
-- ✅ 8-metric CV evaluation system
-- ✅ Chat session management
-
-**If you're not on this version, run:** `uv run alembic upgrade head`
-
-### Running Tests
-```bash
-uv run pytest
+**Response:**
+```json
+{
+  "thread_id": "job-abc123",
+  "response": "# Senior Backend Engineer\n\n## About the Role\n...",
+  "job_saved": false
+}
 ```
 
-### Code Formatting
+---
+
+### Candidate Matching
+
+#### `POST /matcher/match`
+Match candidates to a job using AI.
+
+**Request:**
 ```bash
-uv run black app/
-uv run ruff check app/
+curl -X POST "http://localhost:8000/api/v1/matcher/match" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_id": 42,
+    "top_k": 10
+  }'
 ```
 
-### Database Management
-
-#### View Database Schema
-
-```bash
-# View database tables
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "\dt"
-
-# Access database shell
-docker exec -it recruitgenius-postgres psql -U recruitgenius recruitgenius
-
-# View specific table structure
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "\d candidates"
+**Response:**
+```json
+{
+  "job_id": 42,
+  "summary": {
+    "total_candidates_evaluated": 10,
+    "avg_match_score": 72.5
+  },
+  "candidates": [
+    {
+      "candidate_id": 15,
+      "name": "Jane Smith",
+      "composite_score": 87.5,
+      "metrics": {
+        "skills_match_score": 92.0,
+        "experience_relevance_score": 8.5,
+        "education_fit_score": 9.0
+      }
+    }
+  ]
+}
 ```
 
-#### Migration Management
+---
 
-This project uses **Alembic** for database migrations. The migration history is:
+### CV Chat Interface
 
-1. **d96d37f98471** - Initial schema (candidates, jobs, matches, agent_executions)
-2. **4165a975d65b** - Add cv_embeddings, cv_metrics, chat_sessions tables
-3. **effc88337b9a** (HEAD) - Add cvs, job_embeddings, job_metadata, refactor relations
+#### `POST /chat`
+Query CV database using natural language.
 
+**Request:**
 ```bash
-# Create new migration (after model changes)
-uv run alembic revision --autogenerate -m "description of changes"
-
-# Apply migrations (upgrade to latest)
-uv run alembic upgrade head
-
-# Apply specific migration
-uv run alembic upgrade <revision_id>
-
-# Rollback one migration
-uv run alembic downgrade -1
-
-# View migration history
-uv run alembic history
-
-# View current migration version
-uv run alembic current
+curl -X POST "http://localhost:8000/api/v1/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Find me Python developers with 5+ years experience"
+  }'
 ```
 
-**⚠️ Always run migrations after pulling new code!**
-
-### Docker Commands
-```bash
-# Start services
-cd local && docker compose up -d
-
-# Stop services
-cd local && docker compose down
-
-# View logs
-docker compose logs -f postgres
-
-# Restart services
-cd local && docker compose restart
+**Response:**
+```json
+{
+  "thread_id": "chat-xyz789",
+  "response_text": "I found 12 Python developers with 5+ years of experience...",
+  "structured_response": {
+    "type": "chat_response",
+    "agent_used_tools": true
+  }
+}
 ```
 
-## Troubleshooting
+---
 
-### Common Issues on New Machines
+## 🔄 CV Processing Pipeline
 
-**❌ Error: "relation [table_name] does not exist" or "column [column_name] does not exist"**
+Comprehensive workflow for CV ingestion and analysis:
 
-This means database migrations haven't been applied. **Solution:**
-```bash
-# Ensure database exists
-docker exec recruitgenius-postgres psql -U recruitgenius -c "CREATE DATABASE recruitgenius;"
-
-# Enable pgvector extension
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "CREATE EXTENSION IF NOT EXISTS vector;"
-
-# Apply ALL migrations
-uv run alembic upgrade head
-
-# Verify current migration version
-uv run alembic current
-# Should show: effc88337b9a (head)
+```
+Upload CV (PDF/DOCX)
+    ↓
+1. File Validation (type, size, integrity)
+    ↓
+2. Text Extraction (PyPDF/python-docx)
+    ↓
+3. Quick Metadata Extraction (email, name, phone)
+    ↓
+4. Candidate Matching/Creation (by email)
+    ↓
+5. Language Detection (langdetect - 50+ languages)
+    ↓
+6. Translation to English (GPT-4o-mini)
+    ↓
+7. Comprehensive Metadata Extraction (LLM)
+    ↓
+8. Text Chunking (500 tokens, 50 overlap)
+    ↓
+9. Embedding Generation (OpenAI)
+    ↓
+10. Database Storage (PostgreSQL + pgvector)
+    ↓
+CV Ready for Matching
 ```
 
-**❌ Error: "could not connect to server"**
+---
 
-Database container isn't running. **Solution:**
-```bash
-# Check if containers are running
-cd local && docker compose ps
+## 🎯 Job Matching System
 
-# Start containers if stopped
-docker compose up -d
+### RAG-First Architecture
 
-# Check logs for errors
-docker compose logs postgres
+```
+1. Wide Net Retrieval (RAG)
+   ↓
+2. Comprehensive Evaluation (8 Metrics)
+   ↓
+3. Intelligent Ranking (Composite Scores)
 ```
 
-**❌ Error: "No module named 'pgvector'" or "extension 'vector' does not exist"**
+### Matching Workflow
 
-The pgvector extension isn't enabled. **Solution:**
-```bash
-# Connect to database and enable extension
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+Job Posted
+    ↓
+Step 1: Job Processing
+    • Extract job description text
+    • Generate job embeddings
+    • Extract structured metadata
+    ↓
+Step 2: RAG Retrieval (Semantic Search)
+    • Vector similarity search (pgvector)
+    • Top-K candidates (e.g., 50)
+    • No hard filters - wide net
+    ↓
+Step 3: Metric Calculation (All 8 Metrics)
+    • Skills Match (25%)
+    • Experience Relevance (20%)
+    • Education Fit (15%)
+    • Achievement Impact (15%)
+    • Keyword Density (10%)
+    • Employment Gap (5%)
+    • Readability (5%)
+    • AI Confidence (5%)
+    ↓
+Step 4: Score Aggregation
+    • Calculate weighted composite score
+    • Normalize to 0-100 range
+    ↓
+Step 5: Ranking & Filtering
+    • Sort by composite score
+    • Return top_k matches
+    ↓
+Ranked Results Presented to HR
 ```
 
-**❌ Error: "openai.AuthenticationError" or "Invalid API key"**
+---
 
-Missing or invalid OpenAI API key. **Solution:**
+## 👨‍💻 Development
+
+### Development Setup
+
 ```bash
-# Edit .env file and add valid key
-OPENAI_API_KEY=sk-proj-your-actual-key-here
-
-# Restart the server after updating .env
-```
-
-### Database Issues
-
-**Check database connection:**
-```bash
-# Test database connection
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "SELECT version();"
-
-# List all tables
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "\dt"
-
-# Expected tables:
-# - candidates, jobs, matches, agent_executions
-# - cvs, cv_embeddings, cv_metrics
-# - job_embeddings, job_metadata
-# - chat_sessions, chat_messages
-```
-
-**Reset database (⚠️ deletes all data):**
-```bash
-# Drop and recreate database
-docker exec recruitgenius-postgres psql -U recruitgenius -c "DROP DATABASE IF EXISTS recruitgenius;"
-docker exec recruitgenius-postgres psql -U recruitgenius -c "CREATE DATABASE recruitgenius;"
-
-# Enable pgvector
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "CREATE EXTENSION IF NOT EXISTS vector;"
-
-# Run migrations from scratch
-uv run alembic upgrade head
-```
-
-**Check migration history:**
-```bash
-# View applied migrations
-uv run alembic history
-
-# View current migration
-uv run alembic current
-
-# Should be at: effc88337b9a (head)
-```
-
-### Port Conflicts
-
-**Port already in use (5432, 8000, 5050):**
-```bash
-# Check what's using the ports
-lsof -i :5432  # PostgreSQL
-lsof -i :8000  # FastAPI
-lsof -i :5050  # pgAdmin
-
-# Option 1: Stop conflicting service
-sudo systemctl stop postgresql  # if system PostgreSQL is running
-
-# Option 2: Change ports in docker-compose.yaml and .env
-```
-
-### Environment Setup
-
-**Verify environment configuration:**
-```bash
-# Check if .env file exists
-ls -la .env
-
-# View current environment variables (without secrets)
-grep -v "API_KEY" .env
-
-# Required variables:
-# - DATABASE_URL
-# - OPENAI_API_KEY
-# - REDIS_URL (optional, for caching)
-```
-
-### Starting Fresh on a New Computer
-
-Complete setup from scratch:
-```bash
-# 1. Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 2. Clone repo and enter directory
-cd backend
-
-# 3. Start Docker services
-cd local && docker compose up -d && cd ..
-
-# 4. Install dependencies
+# Install dependencies
 uv sync
 
-# 5. Create .env file
-cp .env.example .env
-# Edit .env and add OPENAI_API_KEY
+# Start services
+docker compose up -d db pgadmin
 
-# 6. Create database
-docker exec recruitgenius-postgres psql -U recruitgenius -c "CREATE DATABASE recruitgenius;"
-
-# 7. Enable pgvector
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "CREATE EXTENSION IF NOT EXISTS vector;"
-
-# 8. Run migrations
+# Run migrations
 uv run alembic upgrade head
 
-# 9. Verify setup
-uv run alembic current  # Should show: effc88337b9a
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "\dt"  # Should list all tables
-
-# 10. Start server
+# Start development server
 uv run uvicorn app.main:app --reload
 ```
 
-### Quick Diagnostics
-
-Run these commands to diagnose issues:
+### Database Migrations
 
 ```bash
-# Check Docker containers status
-cd local && docker compose ps
+# Create new migration
+uv run alembic revision --autogenerate -m "description"
 
-# Check database connection
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "SELECT 1;"
+# Apply migrations
+uv run alembic upgrade head
 
-# Check installed tables
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "\dt"
-
-# Check migration version
-uv run alembic current
-
-# Check Python environment
-uv run python --version
-which python
-
-# Test OpenAI connection
-uv run python -c "import openai; print('OpenAI module loaded')"
+# Rollback
+uv run alembic downgrade -1
 ```
 
-## Additional Resources
+### Code Quality
 
-- **Documentation**: See `docs/` folder for detailed architecture and implementation guides
-- **API Documentation**: http://localhost:8000/docs (when server is running)
-- **pgAdmin**: http://localhost:5050 for database management
-- **LangGraph Docs**: https://langchain-ai.github.io/langgraph/
-- **FastAPI Docs**: https://fastapi.tiangolo.com/
+```bash
+# Format code
+uv run black app/
 
-## License
+# Lint code
+uv run ruff check app/
 
-MIT
+# Run all checks
+uv run black app/ && uv run ruff check app/
+```
+
+### Testing
+
+```bash
+# Run all tests
+uv run pytest
+
+# With coverage
+uv run pytest --cov=app tests/
+
+# Verbose output
+uv run pytest -v
+```
+
+---
+
+## 🚀 Deployment
+
+### Docker Production
+
+```bash
+# Build and start
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop services
+docker compose down
+```
+
+### Health Checks
+
+```bash
+# Application health
+curl http://localhost:8000/api/v1/health
+
+# Docker status
+docker compose ps
+```
+
+---
+
+## 📚 Documentation
+
+### Core Documentation
+
+- [HYBRID_MATCHING_ARCHITECTURE.md](docs/HYBRID_MATCHING_ARCHITECTURE.md) - Matching system architecture
+- [IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md) - Implementation guide
+- [CV_CHAT_AGENT.md](docs/CV_CHAT_AGENT.md) - CV chat interface
+- [MATCHER_AGENT.md](docs/MATCHER_AGENT.md) - Matching agent workflow
+- [JOB_GENERATION_WORKFLOW.md](docs/JOB_GENERATION_WORKFLOW.md) - Job generation
+- [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) - Quick reference
+
+### API Documentation
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+- **OpenAPI JSON**: http://localhost:8000/openapi.json
+
+---
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### Database Connection Errors
+
+```bash
+# Check if database is running
+docker compose ps
+
+# Start database
+docker compose up -d db
+
+# Test connection
+docker compose exec db psql -U postgres -c "SELECT 1;"
+```
+
+#### Migration Errors
+
+```bash
+# Check current version
+uv run alembic current
+
+# Apply migrations
+uv run alembic upgrade head
+```
+
+#### pgvector Extension Missing
+
+```bash
+# Enable extension
+docker compose exec db psql -U postgres -d recruitment \
+  -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+#### OpenAI API Errors
+
+- Verify API key in `.env` file
+- Check account has credits
+- Implement rate limiting
+
+### Debug Mode
+
+```env
+DEBUG=true
+LANGCHAIN_TRACING_V2=true
+```
+
+### Reset Everything
+
+```bash
+# ⚠️ WARNING: Deletes all data
+docker compose down -v
+docker compose up -d
+uv run alembic upgrade head
+```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a feature branch
+3. Follow code style guidelines
+4. Write tests for new features
+5. Submit a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 🙏 Acknowledgments
+
+- **FastAPI** - Modern Python web framework
+- **LangChain & LangGraph** - LLM orchestration
+- **OpenAI** - GPT models and embeddings
+- **pgvector** - Vector similarity search
+- **Hackathon Team** - Development and design
+
+---
+
+## 📞 Contact & Support
+
+- **Documentation**: [docs/](docs/)
+- **API Docs**: http://localhost:8000/docs
+- **Email**: valerio.silva@klx.pt
+
+---
+
+<div align="center">
+
+**Built with ❤️ by the Hackathon Team**
+
+**Powered by FastAPI • LangGraph • PostgreSQL • OpenAI**
+
+⭐ Star us on GitHub if you find this useful!
+
+</div>

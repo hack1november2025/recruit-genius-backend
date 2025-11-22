@@ -76,13 +76,27 @@ def upgrade() -> None:
     op.create_index(op.f('ix_cv_metrics_candidate_id'), 'cv_metrics', ['candidate_id'], unique=False)
     op.create_index(op.f('ix_cv_metrics_id'), 'cv_metrics', ['id'], unique=False)
     op.create_index(op.f('ix_cv_metrics_job_id'), 'cv_metrics', ['job_id'], unique=False)
-    op.drop_index(op.f('checkpoints_thread_id_idx'), table_name='checkpoints')
-    op.drop_table('checkpoints')
-    op.drop_index(op.f('checkpoint_blobs_thread_id_idx'), table_name='checkpoint_blobs')
-    op.drop_table('checkpoint_blobs')
-    op.drop_table('checkpoint_migrations')
-    op.drop_index(op.f('checkpoint_writes_thread_id_idx'), table_name='checkpoint_writes')
-    op.drop_table('checkpoint_writes')
+    
+    # Drop checkpoint tables if they exist (they may not exist in fresh installations)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_tables = inspector.get_table_names()
+    
+    if 'checkpoints' in existing_tables:
+        op.drop_index(op.f('checkpoints_thread_id_idx'), table_name='checkpoints', if_exists=True)
+        op.drop_table('checkpoints')
+    
+    if 'checkpoint_blobs' in existing_tables:
+        op.drop_index(op.f('checkpoint_blobs_thread_id_idx'), table_name='checkpoint_blobs', if_exists=True)
+        op.drop_table('checkpoint_blobs')
+    
+    if 'checkpoint_migrations' in existing_tables:
+        op.drop_table('checkpoint_migrations')
+    
+    if 'checkpoint_writes' in existing_tables:
+        op.drop_index(op.f('checkpoint_writes_thread_id_idx'), table_name='checkpoint_writes', if_exists=True)
+        op.drop_table('checkpoint_writes')
+    
     op.add_column('jobs', sa.Column('additional_metadata', sa.JSON(), nullable=True))
     op.drop_column('jobs', 'required_skills')
     op.drop_column('jobs', 'experience_required')

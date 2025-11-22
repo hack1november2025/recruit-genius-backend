@@ -1,16 +1,18 @@
-"""Service for processing job descriptions with embeddings and metadata."""
+"""Service for processing job descriptions with embeddings and metadata using LangChain."""
 from sqlalchemy.ext.asyncio import AsyncSession
+from langchain_core.documents import Document
+from app.services.vector_store_service import VectorStoreService
 from app.services.embedding_service import EmbeddingService
 from app.services.job_metadata_extraction_service import JobMetadataExtractionService
-from app.db.models.job_embedding import JobEmbedding
 from app.db.models.job_metadata import JobMetadata
 from app.core.logging import llm_logger
 
 
 class JobProcessingService:
-    """Service for processing job descriptions: embeddings + metadata extraction."""
+    """Service for processing job descriptions: embeddings + metadata extraction using LangChain."""
     
     def __init__(self):
+        self.vector_store_service = VectorStoreService()
         self.embedding_service = EmbeddingService()
         self.metadata_service = JobMetadataExtractionService()
     
@@ -63,21 +65,35 @@ class JobProcessingService:
             )
             db.add(job_metadata)
             
-            # Create embeddings
+            # Create embeddings using LangChain vector store
             llm_logger.info("Creating job description embeddings")
             chunks = self.embedding_service.chunk_text(job_description, chunk_size=500, overlap=50)
-            embeddings = await self.embedding_service.generate_embeddings(chunks)
             
-            # Store embeddings
-            for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                job_embedding = JobEmbedding(
-                    job_id=job_id,
-                    chunk_index=idx,
-                    chunk_text=chunk,
-                    embedding=embedding,
-                    embedding_metadata={"source": "job_processing_service"}
+            # Create LangChain Documents with metadata
+            documents = [
+                Document(
+                    page_content=chunk,
+                    metadata={
+                        "job_id": job_id,
+                        "chunk_index": idx,
+                        "source": "job_processing_service",
+                        "entity_type": "job",
+                        "title": metadata_dict.get("title", ""),
+                        "required_skills": metadata_dict.get("required_skills", [])[:5],  # First 5 skills
+                        "seniority_level": metadata_dict.get("seniority_level", ""),
+                    }
                 )
-                db.add(job_embedding)
+                for idx, chunk in enumerate(chunks)
+            ]
+            
+            # Store in LangChain vector store (runs in thread pool)
+            import asyncio
+            vector_store = self.vector_store_service.get_vector_store()
+            await asyncio.to_thread(
+                vector_store.add_documents,
+                documents,
+                ids=[f"job_{job_id}_chunk_{idx}" for idx in range(len(chunks))]
+            )
             
             await db.commit()
             

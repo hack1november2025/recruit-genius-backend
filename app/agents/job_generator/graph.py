@@ -1,10 +1,8 @@
 """LangGraph workflow for job description generation."""
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.prebuilt import ToolNode
 from app.agents.job_generator.state import JobGeneratorState
-from app.agents.job_generator.nodes import call_model, route_after_agent, summarize_messages
-from app.agents.job_generator.tools import save_job_to_database
+from app.agents.job_generator.nodes import call_model, call_tools, route_after_agent, summarize_messages
 from app.core.config import get_settings
 from app.core.logging import llm_logger
 import psycopg
@@ -55,7 +53,7 @@ async def create_job_generator_graph() -> StateGraph:
     # Add nodes
     workflow.add_node("summarize", summarize_messages)  # Middleware for context management
     workflow.add_node("agent", call_model)
-    workflow.add_node("tools", ToolNode([save_job_to_database]))
+    workflow.add_node("tools", call_tools)  # Custom tool execution node for async DB operations
     
     # Define edges
     # First, check if summarization is needed

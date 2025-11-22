@@ -146,7 +146,14 @@ async def call_model(state: JobGeneratorState) -> dict:
 
 
 async def call_tools(state: JobGeneratorState) -> dict:
-    """Execute tool calls from the agent."""
+    """
+    Execute tool calls from the agent.
+    
+    Custom implementation to properly handle async database operations
+    instead of using LangChain's ToolNode which has issues with SQLAlchemy async.
+    """
+    from langchain_core.messages import ToolMessage
+    
     messages = state["messages"]
     last_message = messages[-1]
     
@@ -156,16 +163,48 @@ async def call_tools(state: JobGeneratorState) -> dict:
     if not tool_calls:
         return {}
     
-    # Execute tools using ToolNode (LangGraph 0.2.x pattern)
-    from langgraph.prebuilt import ToolNode
-    tool_node = ToolNode([save_job_to_database])
-    
     llm_logger.info(f"Executing {len(tool_calls)} tool(s)")
     
-    # ToolNode handles the execution and message formatting
-    result = await tool_node.ainvoke(state)
+    tool_messages = []
     
-    return result
+    # Execute each tool call
+    for tool_call in tool_calls:
+        tool_name = tool_call["name"]
+        tool_args = tool_call["args"]
+        tool_call_id = tool_call["id"]
+        
+        llm_logger.info(f"Calling tool: {tool_name} with args: {tool_args}")
+        
+        try:
+            # Execute the tool directly (not via .ainvoke) to maintain proper async context
+            if tool_name == "save_job_to_database":
+                # Call the underlying coroutine function directly with kwargs
+                result = await save_job_to_database.coroutine(**tool_args)
+            else:
+                result = f"Unknown tool: {tool_name}"
+            
+            llm_logger.info(f"Tool {tool_name} executed successfully")
+            
+            # Create tool message with result
+            tool_message = ToolMessage(
+                content=str(result),
+                tool_call_id=tool_call_id,
+                name=tool_name
+            )
+            tool_messages.append(tool_message)
+            
+        except Exception as e:
+            llm_logger.error(f"Tool execution failed: {str(e)}")
+            
+            # Create error message
+            tool_message = ToolMessage(
+                content=f"Error executing {tool_name}: {str(e)}",
+                tool_call_id=tool_call_id,
+                name=tool_name
+            )
+            tool_messages.append(tool_message)
+    
+    return {"messages": tool_messages}
 
 
 def route_after_agent(state: JobGeneratorState) -> str:

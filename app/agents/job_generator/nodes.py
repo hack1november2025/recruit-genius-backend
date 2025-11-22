@@ -11,7 +11,7 @@ settings = get_settings()
 
 # Create LLM with tool binding
 llm = ChatOpenAI(
-    model="gpt-4o-mini", 
+    model=settings.llm_model, 
     temperature=0.7, 
     openai_api_key=settings.openai_api_key
 )
@@ -19,7 +19,7 @@ llm_with_tools = llm.bind_tools([save_job_to_database])
 
 # Summarization LLM (same model, but for summarization)
 summarization_llm = ChatOpenAI(
-    model="gpt-4o-mini",
+    model=settings.llm_model,
     temperature=0,  # Lower temperature for consistent summaries
     openai_api_key=settings.openai_api_key
 )

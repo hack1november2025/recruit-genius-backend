@@ -86,9 +86,9 @@ Always call the search tool first before responding about candidates.
     
     # Create LLM with better model for reasoning
     llm = ChatOpenAI(
-        model="gpt-4o",
+        model=settings.llm_rag_model,
         temperature=0,
-        openai_api_key=settings.openai_api_key,
+        openai_api_key=settings.openai_api_key
     )
     
     # Get tools for the agent

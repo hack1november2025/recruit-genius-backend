@@ -52,6 +52,10 @@ services:
       # OpenAI (set your API key)
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       
+      # LLM Models
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      LLM_RAG_MODEL: ${LLM_RAG_MODEL:-gpt-4o}
+      
       # LangChain (optional)
       LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-false}
       LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY:-}

@@ -60,7 +60,7 @@ async def understand_query_node(state: CVChatState, db: AsyncSession) -> dict:
         
         settings = get_settings()
         llm = ChatOpenAI(
-            model="gpt-4o",
+            model=settings.llm_rag_model,
             temperature=0,
             openai_api_key=settings.openai_api_key,
             model_kwargs={"response_format": {"type": "json_object"}}
@@ -281,8 +281,8 @@ async def generate_response_node(state: CVChatState, db: AsyncSession) -> dict:
         
         settings = get_settings()
         llm = ChatOpenAI(
-            model="gpt-4o",
-            temperature=0.3,
+            model=settings.llm_rag_model,
+            temperature=0,
             openai_api_key=settings.openai_api_key
         )
         

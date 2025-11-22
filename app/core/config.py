@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str
     
+    # LLM Models
+    llm_model: str = "gpt-4o"  # Model for general agents (job generator, recruiter, etc.)
+    llm_rag_model: str = "gpt-4o"  # Model for RAG/chat agents (cv_chat)
+    
     # LangChain (optional)
     langchain_tracing_v2: bool = False
     langchain_api_key: str | None = None

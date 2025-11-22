@@ -51,8 +51,8 @@ class JobMetadataExtractionService:
     def __init__(self):
         settings = get_settings()
         self.llm = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
+            model=settings.llm_model,
+            temperature=0.0,
             openai_api_key=settings.openai_api_key
         )
         self.parser = JsonOutputParser(pydantic_object=JobMetadataStructure)

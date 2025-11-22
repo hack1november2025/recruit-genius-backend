@@ -10,7 +10,7 @@ async def analyze_resume(state: RecruiterState) -> dict:
     """Analyze candidate resume and extract key information."""
     
     llm = ChatOpenAI(
-        model="gpt-4o-mini",
+        model=settings.llm_model,
         temperature=0,
         api_key=settings.openai_api_key
     )
@@ -48,7 +48,7 @@ async def match_candidate_to_job(state: RecruiterState) -> dict:
     """Match candidate to job and calculate match score."""
     
     llm = ChatOpenAI(
-        model="gpt-4o-mini",
+        model=settings.llm_model,
         temperature=0,
         api_key=settings.openai_api_key
     )
@@ -99,7 +99,7 @@ async def generate_recommendations(state: RecruiterState) -> dict:
     """Generate hiring recommendations based on analysis."""
     
     llm = ChatOpenAI(
-        model="gpt-4o-mini",
+        model=settings.llm_model,
         temperature=0.3,
         api_key=settings.openai_api_key
     )

@@ -38,10 +38,10 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Alembic
-alembic/versions/*.py
-!alembic/versions/.gitkeep
+# Alembic - DO NOT IGNORE MIGRATIONS! Other developers need them!
+# Only ignore backup files
+alembic/versions/*.bak
+alembic/versions/*~
 
 .github
-docs
 specifications

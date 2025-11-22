@@ -17,20 +17,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: recruitment-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
   # FastAPI Application
   app:
     build:
@@ -45,9 +31,6 @@ services:
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_NAME: recruitment
-      
-      # Redis
-      REDIS_URL: redis://redis:6379/0
       
       # OpenAI (set your API key)
       OPENAI_API_KEY: ${OPENAI_API_KEY}
@@ -78,8 +61,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
@@ -103,179 +84,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # MinIO Object Storage
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
-    container_name: recruitment-minio
-    environment:
-      MINIO_ROOT_USER: manager
-      MINIO_ROOT_PASSWORD: pdtSWmdceBqtmTMLaG7oW4ckUA8nLYZv
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"  # API port
-      - "9001:9001"  # Console port
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    restart: unless-stopped
-
-  # ClickHouse Database (for Langfuse analytics)
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.3-alpine
-    container_name: recruitment-clickhouse
-    environment:
-      CLICKHOUSE_DB: langfuse
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: Q7wE4rT8yU2iO5pA9sD3fG6hJ1kL0zX
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    ports:
-      - "8123:8123"  # HTTP interface
-      - "9002:9000"  # Native interface (remapped to avoid conflict with MinIO)
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-
-  # Langfuse Worker (background jobs)
-  langfuse-worker:
-    image: langfuse/langfuse-worker:3.104.0
-    container_name: recruitment-langfuse-worker
-    environment:
-      NEXTAUTH_URL: http://localhost:3000
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/langfuse
-      SALT: nR8jK5fH2wQ9pL7xM3vB6sD4tG8yU1
-      ENCRYPTION_KEY: a7f3c8e1b9d4a2f6c5e8b1d7f3a9c6e2b8f4d1a7c3e9f6b2d8a5c1e7f4b9d6a3
-      TELEMETRY_ENABLED: "false"
-      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "true"
-      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
-      CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: Q7wE4rT8yU2iO5pA9sD3fG6hJ1kL0zX
-      CLICKHOUSE_CLUSTER_ENABLED: "false"
-      CLICKHOUSE_MIGRATION_CLUSTER_DISABLED: "true"
-      LANGFUSE_USE_AZURE_BLOB: "false"
-      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
-      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: manager
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: pdtSWmdceBqtmTMLaG7oW4ckUA8nLYZv
-      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
-      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
-      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
-      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: manager
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: pdtSWmdceBqtmTMLaG7oW4ckUA8nLYZv
-      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
-      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
-      LANGFUSE_S3_BATCH_EXPORT_ENABLED: "true"
-      LANGFUSE_S3_BATCH_EXPORT_BUCKET: langfuse
-      LANGFUSE_S3_BATCH_EXPORT_PREFIX: exports/
-      LANGFUSE_S3_BATCH_EXPORT_REGION: auto
-      LANGFUSE_S3_BATCH_EXPORT_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT: http://localhost:9000
-      LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID: manager
-      LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY: pdtSWmdceBqtmTMLaG7oW4ckUA8nLYZv
-      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: "true"
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_TLS_ENABLED: "false"
-      HOSTNAME: 0.0.0.0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # Langfuse Web (UI and API)
-  langfuse-web:
-    image: langfuse/langfuse:3.104.0
-    container_name: recruitment-langfuse-web
-    environment:
-      NEXTAUTH_URL: http://localhost:3000
-      NEXTAUTH_SECRET: M9xN7vB4sF8gH2kL5qW1eR3tY6uI0pA
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/langfuse
-      SALT: nR8jK5fH2wQ9pL7xM3vB6sD4tG8yU1
-      ENCRYPTION_KEY: a7f3c8e1b9d4a2f6c5e8b1d7f3a9c6e2b8f4d1a7c3e9f6b2d8a5c1e7f4b9d6a3
-      TELEMETRY_ENABLED: "false"
-      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "true"
-      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
-      CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: Q7wE4rT8yU2iO5pA9sD3fG6hJ1kL0zX
-      CLICKHOUSE_CLUSTER_ENABLED: "false"
-      CLICKHOUSE_MIGRATION_CLUSTER_DISABLED: "true"
-      LANGFUSE_USE_AZURE_BLOB: "false"
-      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
-      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: manager
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: pdtSWmdceBqtmTMLaG7oW4ckUA8nLYZv
-      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
-      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
-      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
-      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: manager
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: pdtSWmdceBqtmTMLaG7oW4ckUA8nLYZv
-      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
-      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
-      LANGFUSE_S3_BATCH_EXPORT_ENABLED: "true"
-      LANGFUSE_S3_BATCH_EXPORT_BUCKET: langfuse
-      LANGFUSE_S3_BATCH_EXPORT_PREFIX: exports/
-      LANGFUSE_S3_BATCH_EXPORT_REGION: auto
-      LANGFUSE_S3_BATCH_EXPORT_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_BATCH_EXPORT_EXTERNAL_ENDPOINT: http://localhost:9000
-      LANGFUSE_S3_BATCH_EXPORT_ACCESS_KEY_ID: manager
-      LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY: pdtSWmdceBqtmTMLaG7oW4ckUA8nLYZv
-      LANGFUSE_S3_BATCH_EXPORT_FORCE_PATH_STYLE: "true"
-      LANGFUSE_INIT_USER_EMAIL: admin@recruitment.local
-      LANGFUSE_INIT_USER_NAME: Admin User
-      LANGFUSE_INIT_USER_PASSWORD: "admin123!@#"
-      AUTH_DISABLE_SIGNUP: "false"
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_TLS_ENABLED: "false"
-      HOSTNAME: 0.0.0.0
-    ports:
-      - "3000:3000"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/public/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-
 volumes:
   postgres_data:
-  redis_data:
   pgadmin-data:
-  minio_data:
-  clickhouse_data:

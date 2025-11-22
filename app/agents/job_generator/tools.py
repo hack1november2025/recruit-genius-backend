@@ -4,6 +4,7 @@ from langchain_core.tools import tool
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import AsyncSessionLocal
 from app.repositories.job import JobRepository
+from app.services.job_processing_service import JobProcessingService
 from app.core.logging import llm_logger
 
 
@@ -27,6 +28,7 @@ async def save_job_to_database(
     try:
         async with AsyncSessionLocal() as db:
             repo = JobRepository(db)
+            processing_service = JobProcessingService()
             
             # Create job
             job = await repo.create(
@@ -40,7 +42,21 @@ async def save_job_to_database(
             
             llm_logger.info(f"Job created with ID: {job.id}")
             
-            return f"✅ Job successfully created with ID {job.id}! The job posting is now saved as a draft and ready for review."
+            # Process job: generate embeddings and extract metadata
+            llm_logger.info(f"Processing job {job.id} - generating embeddings and metadata")
+            processing_result = await processing_service.process_job_description(
+                job_id=job.id,
+                job_description=description,
+                db=db
+            )
+            
+            if processing_result.get("success"):
+                embeddings_count = processing_result.get("embeddings_count", 0)
+                llm_logger.info(f"Job {job.id} processed successfully: {embeddings_count} embeddings created")
+                return f"✅ Job successfully created with ID {job.id}! Generated {embeddings_count} embeddings and extracted metadata for hybrid search."
+            else:
+                llm_logger.warning(f"Job {job.id} created but processing failed: {processing_result.get('error')}")
+                return f"⚠️ Job created with ID {job.id}, but metadata extraction had issues. The job is saved but may need reprocessing."
     
     except Exception as e:
         llm_logger.error(f"Failed to save job: {str(e)}")

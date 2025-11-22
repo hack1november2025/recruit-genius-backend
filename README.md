@@ -2,36 +2,6 @@
 
 AI-powered recruitment assistant built with FastAPI, LangGraph, and PostgreSQL.
 
-## 🚨 Quick Setup for New Machines or After Pulling Changes
-
-If you're setting up on a new computer or seeing errors about **missing tables/columns**, run these commands:
-
-```bash
-# 1. Start Docker (if not running)
-cd local && docker compose up -d && cd ..
-
-# 2. Ensure database exists and has pgvector
-docker exec recruitgenius-postgres psql -U recruitgenius -c "CREATE DATABASE IF NOT EXISTS recruitgenius;"
-docker exec recruitgenius-postgres psql -U recruitgenius recruitgenius -c "CREATE EXTENSION IF NOT EXISTS vector;"
-
-# 3. Install/update dependencies
-uv sync
-
-# 4. Apply ALL database migrations (CRITICAL!)
-uv run alembic upgrade head
-
-# 5. Verify setup
-uv run alembic current  # Should show: effc88337b9a (head)
-
-# 6. Start server
-uv run uvicorn app.main:app --reload
-```
-
-**Common Error:** `relation "cvs" does not exist` or `column "cv_id" does not exist`
-**Solution:** Run `uv run alembic upgrade head` to apply migrations.
-
----
-
 ## Features
 
 - **🤖 Conversational Job Generator**: AI-powered job description creation with context maintenance
@@ -39,6 +9,7 @@ uv run uvicorn app.main:app --reload
 - **🎯 Job Matching**: Match candidates to job positions using AI with 8-metric evaluation
 - **💬 RAG Chat Interface**: Semantic search across CVs with pgvector
 - **📊 Analytics Dashboard**: Real-time recruitment metrics and insights
+- **🐳 Docker Ready**: One-command deployment with automated migrations
 
 ## Tech Stack
 
@@ -48,6 +19,7 @@ uv run uvicorn app.main:app --reload
 - **PostgreSQL + pgvector**: Database with vector similarity search
 - **Redis**: Caching layer for analytics
 - **OpenAI**: GPT-4o-mini for generation, text-embedding-3-small for embeddings
+- **Docker & Docker Compose**: Containerized deployment
 
 ## Quick Start
 
@@ -55,7 +27,57 @@ uv run uvicorn app.main:app --reload
 
 - Python 3.11+
 - Docker & Docker Compose
-- uv (for Python package management)
+- OpenAI API Key
+
+### Option 1: Docker (Recommended)
+
+The fastest way to get started is using Docker with the automated setup script:
+
+```bash
+# 1. Copy environment file and add your OpenAI API key
+cp .env.example .env
+# Edit .env and set OPENAI_API_KEY=your-key-here
+
+# 2. Run the automated Docker setup script
+./docker-start.sh
+```
+
+That's it! The script will:
+- Build the Docker image with all dependencies
+- Start PostgreSQL (with pgvector), Redis, and the application
+- Automatically run all database migrations
+- Verify the application is healthy
+
+**Access the application:**
+- API: http://localhost:8000
+- Swagger Docs: http://localhost:8000/docs
+- Health Check: http://localhost:8000/api/v1/health
+
+**Docker commands:**
+```bash
+# View logs
+docker compose logs -f app
+
+# Stop services
+docker compose down
+
+# Restart
+docker compose restart app
+
+# Rebuild after code changes
+docker compose up -d --build
+```
+
+See [README.Docker.md](README.Docker.md) for detailed Docker documentation.
+
+---
+
+### Option 2: Local Development (with uv)
+
+For local development with hot-reload:
+
+**Prerequisites:**
+- uv (Python package manager)
 
 Install uv if you haven't:
 ```bash

@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     langchain_tracing_v2: bool = False
     langchain_api_key: str | None = None
     langchain_project: str | None = None
+    # Optional Redis URL (may be provided in environment)
+    redis_url: str | None = None
+    # Telegram
+    telegram_bot_token: str | None = None
     
     # Server
     host: str = "0.0.0.0"

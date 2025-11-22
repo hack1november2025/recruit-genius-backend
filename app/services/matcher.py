@@ -20,7 +20,7 @@ class MatcherService:
         persist_matches: bool = True
     ) -> dict:
         """
-        Find best matching candidates for a job using hybrid search.
+        Find best matching candidates for a job using semantic search.
         
         Args:
             job_id: Job ID to match candidates against
@@ -83,7 +83,7 @@ class MatcherService:
                         "seniority_match": candidate.get("seniority_match", "Unknown"),
                         "experience": candidate.get("experience", {}),
                         "location_match": candidate.get("location_match", {}),
-                        "similarity_score": candidate.get("hybrid_similarity_score", 0),
+                        "similarity_score": candidate.get("semantic_similarity_score", 0),
                         "metrics_details": candidate.get("metrics_details", {}),
                     }
                 )

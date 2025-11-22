@@ -70,7 +70,7 @@ async def _save_job_impl(
             if processing_result.get("success"):
                 embeddings_count = processing_result.get("embeddings_count", 0)
                 llm_logger.info(f"Job {job_id} processed successfully: {embeddings_count} embeddings created")
-                result = f"✅ Job successfully created with ID {job_id}! Generated {embeddings_count} embeddings and extracted metadata for hybrid search."
+                result = f"✅ Job successfully created with ID {job_id}! Generated {embeddings_count} embeddings and extracted metadata for semantic search."
             else:
                 llm_logger.warning(f"Job {job_id} created but processing failed: {processing_result.get('error')}")
                 result = f"⚠️ Job created with ID {job_id}, but metadata extraction had issues. The job is saved but may need reprocessing."

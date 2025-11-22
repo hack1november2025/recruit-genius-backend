@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload
 from app.agents.matcher.state import MatcherState
 from app.db.models.job import Job
 from app.db.models.job_metadata import JobMetadata
-from app.repositories.hybrid_search import HybridSearchRepository
+from app.repositories.semantic_search import SemanticSearchRepository
 from app.repositories.cv_metrics import CVMetricsRepository
 from app.services.cv_metrics_calculator import CVMetricsCalculator
 from app.core.logging import rag_logger
@@ -138,9 +138,9 @@ async def rag_search_node(state: MatcherState, db: AsyncSession) -> Dict[str, An
         }
     
     try:
-        repo = HybridSearchRepository(db)
+        repo = SemanticSearchRepository(db)
         
-        # Perform RAG-only search using LangChain vector store
+        # Perform semantic search using LangChain vector store
         candidates = await repo.search_candidates(
             query_text=job_text,
             top_k=top_k,
@@ -279,7 +279,7 @@ def score_candidates_node(state: MatcherState) -> Dict[str, Any]:
             
             # Overall scores
             "match_score": metrics.get("composite_score", 0),
-            "hybrid_similarity_score": result["similarity_score"],
+            "semantic_similarity_score": result["similarity_score"],
             
             # Core Fit Metrics
             "skills_match_score": metrics.get("skills_match_score", 0),

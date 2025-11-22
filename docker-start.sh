@@ -48,6 +48,11 @@ if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "your-openai-api-key-here" 
     exit 1
 fi
 
+# Check if TELEGRAM_BOT_TOKEN is set
+if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ "$TELEGRAM_BOT_TOKEN" = "your-telegram-bot-token-here" ]; then
+    echo "⚠️ TELEGRAM_BOT_TOKEN is not set in .env file."
+    echo "Please edit .env and set a valid Telegram bot token (if you plan to use the Telegram bot)."
+fi
 echo ""
 echo "🔨 Building Docker images..."
 $DOCKER_COMPOSE build

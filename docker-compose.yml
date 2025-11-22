@@ -34,6 +34,8 @@ services:
       
       # OpenAI (set your API key)
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # Telegram bot token (optional)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       
       # LLM Models
       LLM_MODEL: ${LLM_MODEL:-gpt-4o}
@@ -79,6 +81,27 @@ services:
       - "5050:80"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  telegram:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: recruitment-telegram
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/recruitment
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: recruitment
+    working_dir: /app
+    command: ["python", "-u", "-m", "bot.telegram_handler"]
     depends_on:
       db:
         condition: service_healthy

@@ -15,8 +15,7 @@ class ChatOrchestrator:
     Service to orchestrate CV chat agent execution.
     
     This service uses LangGraph's built-in checkpointer for conversation persistence.
-    No need for separate chat_session and chat_message tables - the checkpointer
-    handles all conversation state and history automatically per thread_id.
+    The checkpointer handles all conversation state and history automatically per thread_id.
     """
     
     def __init__(self, db: AsyncSession):

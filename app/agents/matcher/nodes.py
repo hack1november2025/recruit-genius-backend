@@ -5,7 +5,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from app.agents.matcher.state import MatcherState
 from app.db.models.job import Job
-from app.db.models.job_embedding import JobEmbedding
 from app.db.models.job_metadata import JobMetadata
 from app.repositories.hybrid_search import HybridSearchRepository
 from app.repositories.cv_metrics import CVMetricsRepository
